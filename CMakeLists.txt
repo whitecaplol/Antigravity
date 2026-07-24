@@ -10,6 +10,19 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(Antigravity VERSION 1.0.0)
 
+include(FetchContent)
+
+FetchContent_Declare(
+    box2d
+    GIT_REPOSITORY https://github.com/erincatto/box2d.git
+    GIT_TAG        v2.4.1
+)
+
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE INTERNAL "")
+set(BOX2D_BUILD_TESTBED OFF CACHE INTERNAL "")
+
+FetchContent_MakeAvailable(box2d)
+
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
@@ -23,3 +36,9 @@ endif()
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
 setup_geode_mod(${PROJECT_NAME})
+
+target_link_libraries(${PROJECT_NAME} box2d)
+
+if (MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_definitions(box2d PRIVATE _ITERATOR_DEBUG_LEVEL=0 _HAS_ITERATOR_DEBUGGING=0)
+endif()

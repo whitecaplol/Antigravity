@@ -1,23 +1,13 @@
 # Antigravity
-This is where she makes a mod.
+(Not to be confused by that "agentic development platform")
 
-<img src="logo.png" width="150" alt="the mod's logo" />
+Makes any UI have gravity
+- Doesn't matter what it is or what mod.
 
-*Update logo.png to change your mod's icon (please)*
+## Features
+Adds physics (why not?)
 
-## Getting started
-We recommend heading over to [the getting started section on our docs](https://docs.geode-sdk.org/getting-started/) for useful info on what to do next.
-
-## Build instructions
-For more info, see [our docs](https://docs.geode-sdk.org/getting-started/create-mod#build)
-```sh
-# Assuming you have the Geode CLI set up already
-geode build
-```
-
-# Resources
-* [Geode SDK Documentation](https://docs.geode-sdk.org/)
-* [Geode SDK Source Code](https://github.com/geode-sdk/geode/)
-* [Geode CLI](https://github.com/geode-sdk/cli)
-* [Bindings](https://github.com/geode-sdk/bindings/)
-* [Dev Tools](https://github.com/geode-sdk/DevTools)
+## Limitations
+Currently, consists of some of the following:
+- Gravity doesn't work on newly spawned nodes
+- Not fine grained
