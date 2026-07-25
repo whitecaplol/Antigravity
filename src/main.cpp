@@ -2,13 +2,14 @@
 #include <unordered_map>
 
 #include <Geode/Geode.hpp>
+#include <arc/prelude.hpp>
 #include <box2d/box2d.h>
 
 using namespace geode::prelude;
 
 template <typename... Types>
-bool is_any_of(cocos2d::CCNode* node) {
-    return (typeinfo_cast<Types>(node) || ...);
+bool is_any_of(CCNode* node) {
+    return (... || typeinfo_cast<Types>(node));
 }
 
 void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCSize& winSize) {
@@ -18,13 +19,11 @@ void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCS
         CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node);
     bool isSmallEnough = node->getScaledContentHeight() < winSize.height &&
         node->getScaledContentWidth() < winSize.width;
-    // bool isOpaque = false;
-    // if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
-    //     isOpaque = opacityNode->getOpacity() > 0;
-    // }
 
-    if (isCorrectType && isSmallEnough) { //&& isOpaque) {
+    if (isCorrectType && isSmallEnough) {
         visited->push_back(WeakRef(node));
+        return;
+    } else if (isCorrectType && !isSmallEnough) {
         return;
     }
 
@@ -66,7 +65,7 @@ class $modify(AntigravityLayer, CCLayer) {
 
         auto weakThis = WeakRef<CCLayer>(this);
 
-        Loader::get()->queueInMainThread([weakThis]() {
+        async::spawn(arc::sleep(asp::Duration::fromMillis(250)), [weakThis]() {
             auto safeThis = weakThis.lock();
             if (!safeThis || !isStandaloneLayer(safeThis)) return;
 
@@ -90,7 +89,6 @@ class $modify(AntigravityLayer, CCLayer) {
     void setUpPhysics(CCSize& winSize) {
         b2BodyDef borderBodyDef;
         borderBodyDef.type = b2_staticBody;
-        borderBodyDef.position.Set(winSize.width/2, winSize.height/2);
 
         auto borderBody = m_fields->world->CreateBody(&borderBodyDef);
 
@@ -124,7 +122,9 @@ class $modify(AntigravityLayer, CCLayer) {
             if (!safeNode) return;
 
             centralizeAnchorPoint(safeNode);
-            auto position = safeNode->convertToWorldSpace(safeNode->getContentSize() * 0.5f);
+
+            auto halfSize = safeNode->getScaledContentSize() * 0.5f;
+            auto position = safeNode->convertToWorldSpace(halfSize);
 
             b2BodyDef bodyDef;
             bodyDef.type = b2_dynamicBody;
@@ -132,6 +132,19 @@ class $modify(AntigravityLayer, CCLayer) {
             bodyDef.angle = CC_DEGREES_TO_RADIANS(safeNode->getRotation());
 
             auto body = m_fields->world->CreateBody(&bodyDef);
+
+            b2PolygonShape shape;
+            shape.SetAsBox(halfSize.width, halfSize.height);
+
+            b2FixtureDef fixtureDef;
+            fixtureDef.shape = &shape;
+            fixtureDef.density = 1.0f;
+
+            if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(safeNode.data())) {
+                fixtureDef.density = opacityNode->getOpacity() / 255.0f;
+            }
+
+            body->CreateFixture(&fixtureDef);
 
             auto massData = b2MassData{ .mass = safeNode->getScaledContentWidth() * safeNode->getScaledContentHeight() / winSize.width / winSize.height, .center={0,0}, .I=2.5 };
             body->SetMassData(&massData);

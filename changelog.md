@@ -1,2 +1,5 @@
-# 1.0.0
-- Edit this file to change your mod's changelog.
+# 0.0.2
+- Primitively works (to some degree)
+
+# 0.0.1
+- Doesn't even work yet lmao
