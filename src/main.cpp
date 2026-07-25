@@ -1,14 +1,7 @@
-#include "Geode/cocos/base_nodes/CCNode.h"
-#include "Geode/cocos/cocoa/CCAffineTransform.h"
-#include "Geode/cocos/cocoa/CCObject.h"
-#include "Geode/loader/Loader.hpp"
-#include "box2d/b2_body.h"
-#include "box2d/b2_shape.h"
-#include "ccMacros.h"
-#include <Geode/Geode.hpp>
-#include <fmt/base.h>
 #include <vector>
 #include <unordered_map>
+
+#include <Geode/Geode.hpp>
 #include <box2d/box2d.h>
 
 using namespace geode::prelude;
@@ -18,7 +11,7 @@ bool is_any_of(cocos2d::CCNode* node) {
     return (typeinfo_cast<Types>(node) || ...);
 }
 
-void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
+void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCSize& winSize) {
     if (!node) return;
 
     bool isCorrectType = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
@@ -31,7 +24,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     if (isCorrectType && isSmallEnough && isOpaque) {
-        visited->push_back(node);
+        visited->push_back(WeakRef(node));
         return;
     }
 
@@ -51,8 +44,8 @@ bool isStandaloneLayer(CCNode* layer) {
 #include <Geode/modify/CCLayer.hpp>
 class $modify(AntigravityLayer, CCLayer) {
     struct Fields {
-        std::vector<CCNode*>* nodes;
-        std::unordered_map<CCNode*, b2Body*>* maps = new std::unordered_map<CCNode*, b2Body*>();
+        std::vector<WeakRef<CCNode>>* nodes;
+        std::unordered_map<WeakRef<CCNode>, b2Body*>* maps = new std::unordered_map<WeakRef<CCNode>, b2Body*>();
         b2World* world = new b2World({0.0f, -9.8f});
 
         ~Fields() {
@@ -75,7 +68,7 @@ class $modify(AntigravityLayer, CCLayer) {
 
             CCSize winSize = CCDirector::sharedDirector()->getWinSize();
 
-            std::vector<CCNode*>* descendants = new std::vector<CCNode*>{};
+            std::vector<WeakRef<CCNode>>* descendants = new std::vector<WeakRef<CCNode>>{};
             collectDescendants(safeThis, descendants, winSize);
 
             if (descendants->empty()) return;
@@ -117,20 +110,21 @@ class $modify(AntigravityLayer, CCLayer) {
         borderBody->CreateFixture(&edgeShape, 0.0f);
 
         for (const auto& node : *m_fields->nodes) {
-            if (!node) return; // Maybe being a bit paranoid but you never know
-            auto transform = node->nodeToWorldTransform();
+            auto safeNode = node.lock();
+            if (!safeNode) return;
+            auto transform = safeNode->nodeToWorldTransform();
 
             b2BodyDef bodyDef;
             bodyDef.type = b2_dynamicBody;
             bodyDef.position.Set(
-                transform.tx + node->getScaledContentWidth() * (0.5-node->getAnchorPoint().x),
-                transform.ty + node->getScaledContentHeight() * (0.5-node->getAnchorPoint().y)
+                transform.tx + safeNode->getScaledContentWidth() * (0.5-safeNode->getAnchorPoint().x),
+                transform.ty + safeNode->getScaledContentHeight() * (0.5-safeNode->getAnchorPoint().y)
             );
             bodyDef.angle = atan2(transform.b, transform.a);
 
             auto body = m_fields->world->CreateBody(&bodyDef);
 
-            auto massData = b2MassData{ .mass = node->getScaledContentWidth() * node->getScaledContentHeight(), .center={0,0}, .I=2.5 };
+            auto massData = b2MassData{ .mass = safeNode->getScaledContentWidth() * safeNode->getScaledContentHeight(), .center={0,0}, .I=2.5 };
             body->SetMassData(&massData);
 
             m_fields->maps->insert_or_assign(node, body);
@@ -141,8 +135,8 @@ class $modify(AntigravityLayer, CCLayer) {
     void step(float dt) {
         auto map = *m_fields->maps;
         auto world = m_fields->world;
-        std::erase_if(*m_fields->nodes, [&map, &world](CCNode* node) {
-            if (node->getParent()) return false;
+        std::erase_if(*m_fields->nodes, [&map, &world](WeakRef<CCNode> node) {
+            if (node.valid()) return false;
             world->DestroyBody(map[node]);
             map.erase(node);
             return true;
@@ -150,16 +144,17 @@ class $modify(AntigravityLayer, CCLayer) {
 
         world->Step(dt, 8, 3);
         for (const auto& node : *m_fields->nodes) {
+            auto safeNode = node.lock();
             auto position = map[node]->GetPosition();
             auto rotation = -CC_RADIANS_TO_DEGREES(map[node]->GetAngle());
-            node->setPosition(
-                node->convertToNodeSpace(ccp(position.x, position.y) -
+            safeNode->setPosition(
+                safeNode->convertToNodeSpace(ccp(position.x, position.y) -
                 ccp(
-                    node->getScaledContentWidth() * (0.5-node->getAnchorPoint().x),
-                    node->getScaledContentHeight() * (0.5-node->getAnchorPoint().y))
+                    safeNode->getScaledContentWidth() * (0.5-safeNode->getAnchorPoint().x),
+                    safeNode->getScaledContentHeight() * (0.5-safeNode->getAnchorPoint().y))
                 )
             );
-            node->setRotation(rotation);
+            safeNode->setRotation(rotation);
         }
     }
 
