@@ -15,15 +15,15 @@ void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCS
     if (!node) return;
 
     bool isCorrectType = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
-        CCSprite*, CCMenuItemToggler*, Slider*>(node);
+        CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node);
     bool isSmallEnough = node->getScaledContentHeight() < winSize.height &&
         node->getScaledContentWidth() < winSize.width;
-    bool isOpaque = false;
-    if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
-        isOpaque = opacityNode->getOpacity() > 0;
-    }
+    // bool isOpaque = false;
+    // if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
+    //     isOpaque = opacityNode->getOpacity() > 0;
+    // }
 
-    if (isCorrectType && isSmallEnough && isOpaque) {
+    if (isCorrectType && isSmallEnough) { //&& isOpaque) {
         visited->push_back(WeakRef(node));
         return;
     }
@@ -41,10 +41,16 @@ bool isStandaloneLayer(CCNode* layer) {
     return true;
 }
 
+void centralizeAnchorPoint(CCNode* node) {
+    auto oldAnchor = node->getAnchorPoint();
+    node->setPosition(node->getPosition() + ccp((0.5 - oldAnchor.x) * node->getContentWidth(), (0.5 - oldAnchor.y) * node->getContentHeight()));
+    node->setAnchorPoint({0.5, 0.5});
+}
+
 #include <Geode/modify/CCLayer.hpp>
 class $modify(AntigravityLayer, CCLayer) {
     struct Fields {
-        std::vector<WeakRef<CCNode>>* nodes;
+        std::vector<WeakRef<CCNode>>* nodes = new std::vector<WeakRef<CCNode>>{};
         std::unordered_map<WeakRef<CCNode>, b2Body*>* maps = new std::unordered_map<WeakRef<CCNode>, b2Body*>();
         b2World* world = new b2World({0.0f, -9.8f});
 
@@ -66,16 +72,13 @@ class $modify(AntigravityLayer, CCLayer) {
 
             log::info("Found layer {}!", safeThis->getID());
 
-            CCSize winSize = CCDirector::sharedDirector()->getWinSize();
-
-            std::vector<WeakRef<CCNode>>* descendants = new std::vector<WeakRef<CCNode>>{};
-            collectDescendants(safeThis, descendants, winSize);
-
-            if (descendants->empty()) return;
-            log::info("Found {} nodes!", descendants->size());
-
             auto agLayer = static_cast<AntigravityLayer*>(safeThis.data());
-            agLayer->m_fields->nodes = descendants;
+            auto winSize = CCDirector::sharedDirector()->getWinSize();
+
+            collectDescendants(safeThis, agLayer->m_fields->nodes, winSize);
+
+            if (agLayer->m_fields->nodes->empty()) return;
+            log::info("Found {} nodes!", agLayer->m_fields->nodes->size());
 
             agLayer->setUpPhysics(winSize);
             agLayer->schedule(schedule_selector(AntigravityLayer::step));
@@ -109,23 +112,32 @@ class $modify(AntigravityLayer, CCLayer) {
         edgeShape.SetTwoSided(topLeft, bottomLeft);
         borderBody->CreateFixture(&edgeShape, 0.0f);
 
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        std::uniform_real_distribution<float> forceX(-1.0f, 1.0f);
+        std::uniform_real_distribution<float> forceY(0.0f, 5.0f);
+        std::uniform_real_distribution<float> torque(-1.0f, 1.0f);
+
         for (const auto& node : *m_fields->nodes) {
             auto safeNode = node.lock();
             if (!safeNode) return;
-            auto transform = safeNode->nodeToWorldTransform();
+
+            centralizeAnchorPoint(safeNode);
+            auto position = safeNode->convertToWorldSpace(safeNode->getContentSize() * 0.5f);
 
             b2BodyDef bodyDef;
             bodyDef.type = b2_dynamicBody;
-            bodyDef.position.Set(
-                transform.tx + safeNode->getScaledContentWidth() * (0.5-safeNode->getAnchorPoint().x),
-                transform.ty + safeNode->getScaledContentHeight() * (0.5-safeNode->getAnchorPoint().y)
-            );
-            bodyDef.angle = atan2(transform.b, transform.a);
+            bodyDef.position.Set(position.x, position.y);
+            bodyDef.angle = CC_DEGREES_TO_RADIANS(safeNode->getRotation());
 
             auto body = m_fields->world->CreateBody(&bodyDef);
 
-            auto massData = b2MassData{ .mass = safeNode->getScaledContentWidth() * safeNode->getScaledContentHeight(), .center={0,0}, .I=2.5 };
+            auto massData = b2MassData{ .mass = safeNode->getScaledContentWidth() * safeNode->getScaledContentHeight() / winSize.width / winSize.height, .center={0,0}, .I=2.5 };
             body->SetMassData(&massData);
+
+            body->ApplyLinearImpulseToCenter({forceX(gen) * massData.mass, forceY(gen) * massData.mass}, true);
+            body->ApplyAngularImpulse(torque(gen) * massData.mass, true);
 
             m_fields->maps->insert_or_assign(node, body);
             log::info("Created a body definition at {}, {}", m_fields->maps->at(node)->GetPosition().x, m_fields->maps->at(node)->GetPosition().y);
@@ -148,11 +160,9 @@ class $modify(AntigravityLayer, CCLayer) {
             auto position = map[node]->GetPosition();
             auto rotation = -CC_RADIANS_TO_DEGREES(map[node]->GetAngle());
             safeNode->setPosition(
-                safeNode->convertToNodeSpace(ccp(position.x, position.y) -
-                ccp(
-                    safeNode->getScaledContentWidth() * (0.5-safeNode->getAnchorPoint().x),
-                    safeNode->getScaledContentHeight() * (0.5-safeNode->getAnchorPoint().y))
-                )
+                (safeNode->getParent()) ?
+                safeNode->getParent()->convertToNodeSpace({position.x, position.y}) :
+                ccp(position.x, position.y)
             );
             safeNode->setRotation(rotation);
         }
