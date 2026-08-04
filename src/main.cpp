@@ -1,18 +1,24 @@
-#include <vector>
-#include <unordered_map>
-
 #include <Geode/Geode.hpp>
 #include <arc/prelude.hpp>
 #include <box2d/box2d.h>
 
 using namespace geode::prelude;
 
+constexpr float halfThickness = 1.0f;
+
+std::random_device rd;
+std::mt19937 gen(rd());
+
+std::uniform_real_distribution<float> forceX(-1.0f, 1.0f);
+std::uniform_real_distribution<float> forceY(0.0f, 5.0f);
+std::uniform_real_distribution<float> torque(-1.0f, 1.0f);
+
 template <typename... Types>
 bool is_any_of(CCNode* node) {
     return (... || typeinfo_cast<Types>(node));
 }
 
-void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCSize& winSize) {
+void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
     bool isCorrectType = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
@@ -21,7 +27,7 @@ void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCS
         node->getScaledContentWidth() < winSize.width;
 
     if (isCorrectType && isSmallEnough) {
-        visited->push_back(WeakRef(node));
+        visited->push_back(node);
         return;
     } else if (isCorrectType && !isSmallEnough) {
         return;
@@ -33,9 +39,9 @@ void collectDescendants(CCNode* node, std::vector<WeakRef<CCNode>>* visited, CCS
 }
 
 bool isStandaloneLayer(CCNode* layer) {
-    while (layer != nullptr) {
+    while (layer) {
         layer = layer->getParent();
-        if (is_any_of<CCLayer*>(layer)) return false;
+        if (typeinfo_cast<CCLayer*>(layer)) return false;
     }
     return true;
 }
@@ -46,138 +52,140 @@ void centralizeAnchorPoint(CCNode* node) {
     node->setAnchorPoint({0.5, 0.5});
 }
 
+float getAbsoluteRotation(CCNode* node) {
+    float rotation = 0.0f;
+    while (node) {
+        rotation += node->getRotation();
+        node = node->getParent();
+    }
+    return clampf(rotation, -180.0f, 180.0f);
+}
+
 #include <Geode/modify/CCLayer.hpp>
 class $modify(AntigravityLayer, CCLayer) {
     struct Fields {
-        std::vector<WeakRef<CCNode>>* nodes = new std::vector<WeakRef<CCNode>>{};
-        std::unordered_map<WeakRef<CCNode>, b2Body*>* maps = new std::unordered_map<WeakRef<CCNode>, b2Body*>();
-        b2World* world = new b2World({0.0f, -9.8f});
+        std::unordered_map<CCNode*, b2BodyId>* maps = new std::unordered_map<CCNode*, b2BodyId>();
+        b2WorldId worldId;
+
+        Fields() {
+            b2WorldDef worldDef = b2DefaultWorldDef();
+            worldDef.gravity = {0.0f, -9.8f};
+            worldId = b2CreateWorld(&worldDef);
+        }
 
         ~Fields() {
-            delete nodes;
             delete maps;
-            delete world;
+            maps = nullptr;
+
+            b2DestroyWorld(worldId);
+            worldId = b2_nullWorldId;
         }
     };
 
     bool init() {
         if (!CCLayer::init()) return false;
+        if (!isStandaloneLayer(this)) return true;
 
-        auto weakThis = WeakRef<CCLayer>(this);
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+        if (!b2World_IsValid(m_fields->worldId)) {
+            return true;
+        }
+        setUpWorldBorder(winSize);
 
-        async::spawn(arc::sleep(asp::Duration::fromMillis(250)), [weakThis]() {
-            auto safeThis = weakThis.lock();
-            if (!safeThis || !isStandaloneLayer(safeThis)) return;
-
-            log::info("Found layer {}!", safeThis->getID());
-
-            auto agLayer = static_cast<AntigravityLayer*>(safeThis.data());
-            auto winSize = CCDirector::sharedDirector()->getWinSize();
-
-            collectDescendants(safeThis, agLayer->m_fields->nodes, winSize);
-
-            if (agLayer->m_fields->nodes->empty()) return;
-            log::info("Found {} nodes!", agLayer->m_fields->nodes->size());
-
-            agLayer->setUpPhysics(winSize);
-            agLayer->schedule(schedule_selector(AntigravityLayer::step));
-        });
+        this->schedule(schedule_selector(AntigravityLayer::step));
 
         return true;
     }
 
-    void setUpPhysics(CCSize& winSize) {
-        b2BodyDef borderBodyDef;
+    void setUpWorldBorder(CCSize& winSize) {
+        auto borderBodyDef = b2DefaultBodyDef();
         borderBodyDef.type = b2_staticBody;
 
-        auto borderBody = m_fields->world->CreateBody(&borderBodyDef);
+        auto borderBodyId = b2CreateBody(m_fields->worldId, &borderBodyDef);
 
-        b2EdgeShape edgeShape;
-        b2Vec2 bottomLeft(0.0f, 0.0f);
-        b2Vec2 bottomRight(winSize.width, 0.0f);
-        b2Vec2 topRight(winSize.width, winSize.height);
-        b2Vec2 topLeft(0.0f, winSize.height);
+        b2Vec2 vertices[4] = {{0, 0}, {0, winSize.height}, {winSize.width, winSize.height}, {winSize.width, 0}};
+        auto chainDef = b2DefaultChainDef();
+        chainDef.points = vertices;
+        chainDef.count = 4;
+        chainDef.isLoop = true;
 
-        edgeShape.SetTwoSided(bottomLeft, bottomRight);
-        borderBody->CreateFixture(&edgeShape, 0.0f);
+        b2CreateChain(borderBodyId, &chainDef);
+    }
 
-        edgeShape.SetTwoSided(bottomRight, topRight);
-        borderBody->CreateFixture(&edgeShape, 0.0f);
+    void setUpPhysics(CCNode* node, CCSize& winSize) {
+        if (!node) return;
 
-        edgeShape.SetTwoSided(topRight, topLeft);
-        borderBody->CreateFixture(&edgeShape, 0.0f);
+        centralizeAnchorPoint(node);
 
-        edgeShape.SetTwoSided(topLeft, bottomLeft);
-        borderBody->CreateFixture(&edgeShape, 0.0f);
+        auto halfSize = node->getScaledContentSize() * 0.5f;
+        auto position = node->convertToWorldSpace(halfSize);
 
-        std::random_device rd;
-        std::mt19937 gen(rd());
+        b2BodyDef bodyDef = b2DefaultBodyDef();
+        bodyDef.type = b2_dynamicBody;
+        bodyDef.position = {position.x, position.y};
+        bodyDef.rotation = b2MakeRot(CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node)));
 
-        std::uniform_real_distribution<float> forceX(-1.0f, 1.0f);
-        std::uniform_real_distribution<float> forceY(0.0f, 5.0f);
-        std::uniform_real_distribution<float> torque(-1.0f, 1.0f);
+        auto bodyId = b2CreateBody(m_fields->worldId, &bodyDef);
 
-        for (const auto& node : *m_fields->nodes) {
-            auto safeNode = node.lock();
-            if (!safeNode) return;
-
-            centralizeAnchorPoint(safeNode);
-
-            auto halfSize = safeNode->getScaledContentSize() * 0.5f;
-            auto position = safeNode->convertToWorldSpace(halfSize);
-
-            b2BodyDef bodyDef;
-            bodyDef.type = b2_dynamicBody;
-            bodyDef.position.Set(position.x, position.y);
-            bodyDef.angle = CC_DEGREES_TO_RADIANS(safeNode->getRotation());
-
-            auto body = m_fields->world->CreateBody(&bodyDef);
-
-            b2PolygonShape shape;
-            shape.SetAsBox(halfSize.width, halfSize.height);
-
-            b2FixtureDef fixtureDef;
-            fixtureDef.shape = &shape;
-            fixtureDef.density = 1.0f;
-
-            if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(safeNode.data())) {
-                fixtureDef.density = opacityNode->getOpacity() / 255.0f;
-            }
-
-            body->CreateFixture(&fixtureDef);
-
-            auto massData = b2MassData{ .mass = safeNode->getScaledContentWidth() * safeNode->getScaledContentHeight() / winSize.width / winSize.height, .center={0,0}, .I=2.5 };
-            body->SetMassData(&massData);
-
-            body->ApplyLinearImpulseToCenter({forceX(gen) * massData.mass, forceY(gen) * massData.mass}, true);
-            body->ApplyAngularImpulse(torque(gen) * massData.mass, true);
-
-            m_fields->maps->insert_or_assign(node, body);
-            log::info("Created a body definition at {}, {}", m_fields->maps->at(node)->GetPosition().x, m_fields->maps->at(node)->GetPosition().y);
+        b2ShapeDef shapeDef = b2DefaultShapeDef();
+        if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
+            shapeDef.density = opacityNode->getOpacity() / 255.0f;
         }
+
+        auto leftBox = b2MakeOffsetBox(halfThickness, halfSize.height, {-(halfSize.width-halfThickness), 0}, b2Rot_identity);
+        auto leftShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &leftBox);
+
+        auto rightBox = b2MakeOffsetBox(halfThickness, halfSize.height, {(halfSize.width-halfThickness), 0}, b2Rot_identity);
+        auto rightShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &rightBox);
+
+        auto upBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, (halfSize.height-halfThickness)}, b2Rot_identity);
+        auto upShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &upBox);
+
+        auto downBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, -(halfSize.height-halfThickness)}, b2Rot_identity);
+        auto downShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
+
+        auto normalizedWeight = halfSize.height / winSize.height * halfSize.width / winSize.width;
+
+        b2Body_ApplyLinearImpulseToCenter(bodyId, {forceX(gen) * normalizedWeight, forceY(gen) * normalizedWeight}, true);
+        b2Body_ApplyAngularImpulse(bodyId, torque(gen) * normalizedWeight, true);
+
+        m_fields->maps->insert_or_assign(node, bodyId);
+        log::debug("Created a body definition at {}, {}", position.x, position.y);
     }
 
     void step(float dt) {
-        auto map = *m_fields->maps;
-        auto world = m_fields->world;
-        std::erase_if(*m_fields->nodes, [&map, &world](WeakRef<CCNode> node) {
-            if (node.valid()) return false;
-            world->DestroyBody(map[node]);
-            map.erase(node);
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+        std::vector<CCNode*> nodes;
+
+        collectDescendants(this, &nodes, winSize);
+
+        std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
+        std::erase_if(*m_fields->maps, [&lookup](const auto& pair) {
+            if (lookup.contains(pair.first)) return false;
+            b2DestroyBody(pair.second);
             return true;
         });
 
-        world->Step(dt, 8, 3);
-        for (const auto& node : *m_fields->nodes) {
-            auto safeNode = node.lock();
-            auto position = map[node]->GetPosition();
-            auto rotation = -CC_RADIANS_TO_DEGREES(map[node]->GetAngle());
-            safeNode->setPosition(
-                (safeNode->getParent()) ?
-                safeNode->getParent()->convertToNodeSpace({position.x, position.y}) :
+        auto weakThis = WeakRef<CCLayer>(this);
+
+        for (auto node : nodes) {
+            if (!m_fields->maps->contains(node)) {
+                setUpPhysics(node, winSize);
+            }
+        }
+
+        b2World_Step(m_fields->worldId, dt, 4);
+        for (auto node : nodes) {
+            if (!m_fields->maps->contains(node)) continue;
+            auto bodyId = m_fields->maps->at(node);
+            auto position = b2Body_GetPosition(m_fields->maps->at(node));
+            auto rotation = -CC_RADIANS_TO_DEGREES(b2Rot_GetAngle(b2Body_GetRotation(bodyId)));
+            node->setPosition(
+                (node->getParent()) ?
+                node->getParent()->convertToNodeSpace({position.x, position.y}) :
                 ccp(position.x, position.y)
             );
-            safeNode->setRotation(rotation);
+            node->setRotation(rotation);
         }
     }
 

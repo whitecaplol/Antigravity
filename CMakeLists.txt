@@ -9,13 +9,14 @@ endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(Antigravity VERSION 1.0.0)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
 FetchContent_Declare(
     box2d
     GIT_REPOSITORY https://github.com/erincatto/box2d.git
-    GIT_TAG        v2.4.1
+    GIT_TAG        v3.1.1
 )
 
 set(BOX2D_BUILD_UNIT_TESTS OFF CACHE INTERNAL "")
