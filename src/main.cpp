@@ -38,14 +38,6 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 }
 
-bool isStandaloneLayer(CCNode* layer) {
-    while (layer) {
-        layer = layer->getParent();
-        if (typeinfo_cast<CCLayer*>(layer)) return false;
-    }
-    return true;
-}
-
 void centralizeAnchorPoint(CCNode* node) {
     auto oldAnchor = node->getAnchorPoint();
     node->setPosition(node->getPosition() + ccp((0.5 - oldAnchor.x) * node->getContentWidth(), (0.5 - oldAnchor.y) * node->getContentHeight()));
@@ -82,11 +74,7 @@ class $modify(AntigravityLayer, CCLayer) {
         }
     };
 
-    bool init() {
-        if (!CCLayer::init()) return false;
-        if (!isStandaloneLayer(this)) return true;
-
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
+    bool initPhysics(CCSize winSize) {
         if (!b2World_IsValid(m_fields->worldId)) {
             return true;
         }
@@ -133,16 +121,16 @@ class $modify(AntigravityLayer, CCLayer) {
         }
 
         auto leftBox = b2MakeOffsetBox(halfThickness, halfSize.height, {-(halfSize.width-halfThickness), 0}, b2Rot_identity);
-        auto leftShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &leftBox);
+        b2CreatePolygonShape(bodyId, &shapeDef, &leftBox);
 
         auto rightBox = b2MakeOffsetBox(halfThickness, halfSize.height, {(halfSize.width-halfThickness), 0}, b2Rot_identity);
-        auto rightShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &rightBox);
+        b2CreatePolygonShape(bodyId, &shapeDef, &rightBox);
 
         auto upBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, (halfSize.height-halfThickness)}, b2Rot_identity);
-        auto upShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &upBox);
+        b2CreatePolygonShape(bodyId, &shapeDef, &upBox);
 
         auto downBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, -(halfSize.height-halfThickness)}, b2Rot_identity);
-        auto downShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
+        b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
 
         auto normalizedWeight = halfSize.height / winSize.height * halfSize.width / winSize.width;
 
@@ -165,8 +153,6 @@ class $modify(AntigravityLayer, CCLayer) {
             b2DestroyBody(pair.second);
             return true;
         });
-
-        auto weakThis = WeakRef<CCLayer>(this);
 
         for (auto node : nodes) {
             if (!m_fields->maps->contains(node)) {
@@ -192,5 +178,18 @@ class $modify(AntigravityLayer, CCLayer) {
     void onExit() {
         this->unschedule(schedule_selector(AntigravityLayer::step));
         CCLayer::onExit();
+
+    }
+};
+
+#include<Geode/modify/CCDirector.hpp>
+class $modify(CCDirector) {
+    void willSwitchToScene(CCScene* scene) {
+        CCDirector::willSwitchToScene(scene);
+        for (auto child : scene->getChildrenExt()) {
+            if (auto layer = typeinfo_cast<CCLayer*>(child)) {
+                static_cast<AntigravityLayer*>(layer)->initPhysics(getWinSize());
+            }
+        }
     }
 };

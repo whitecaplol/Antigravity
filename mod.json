@@ -8,7 +8,7 @@
 	},
 	"id": "whitecaplol.antigravity",
 	"name": "Antigravity",
-	"version": "v0.0.2",
+	"version": "v0.1.0",
 	"developer": "whitecaplol",
 	"description": "Adds UI to any element",
 	"dependencies": {}

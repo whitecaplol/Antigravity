@@ -1,9 +1,7 @@
 # Antigravity
 (Not to be confused by that "agentic development platform")
 
-<img src="logo.png" width="150" alt="Antigravity logo" />
-
-*Note: this mod is in alpha (in other words, don't expect anything to work well)*
+*Note: this mod is in beta. Things have been somewhat tested, but there may still be issues.*
 
 Makes any UI have gravity (how ironic)
 - Doesn't matter what it is or what source it came from.
@@ -19,7 +17,7 @@ Adds physics (why not?)
 
 ## Limitations
 Currently, consists of some of the following:
-- Gravity doesn't work on newly spawned nodes
-- Not fine grained
-- Poor mod integration (if you install this it works with the main UI but ironcially not Geode's own menu yet)
-    - Note that the goal isn't to hardcode anything (except eventually disabling the mod in-game which i somehow haven't done yet)
+- Not ready for prod
+- Doesn't disable itself in-game (which is, well, important).
+- No preservation of velocities (yet)
+- Out of frame objects may still do physics (notable example includes the main level selector page).
