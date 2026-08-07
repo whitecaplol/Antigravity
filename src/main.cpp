@@ -1,5 +1,4 @@
 #include <Geode/Geode.hpp>
-#include <arc/prelude.hpp>
 #include <box2d/box2d.h>
 
 using namespace geode::prelude;
@@ -78,9 +77,9 @@ class $modify(AntigravityLayer, CCLayer) {
         if (!b2World_IsValid(m_fields->worldId)) {
             return true;
         }
-        setUpWorldBorder(winSize);
 
-        this->schedule(schedule_selector(AntigravityLayer::step));
+        setUpWorldBorder(winSize);
+        schedule(schedule_selector(AntigravityLayer::step));
 
         return true;
     }
@@ -176,9 +175,8 @@ class $modify(AntigravityLayer, CCLayer) {
     }
 
     void onExit() {
-        this->unschedule(schedule_selector(AntigravityLayer::step));
+        unschedule(schedule_selector(AntigravityLayer::step));
         CCLayer::onExit();
-
     }
 };
 
