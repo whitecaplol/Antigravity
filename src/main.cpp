@@ -20,10 +20,8 @@ bool is_any_of(CCNode* node) {
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
-    auto isCorrectType = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
-        CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node);
-
-    if (!isCorrectType) {
+    if (!is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
+        CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node)) {
         for (CCNode* child : node->getChildrenExt()) {
             collectDescendants(child, visited, winSize);
         }
@@ -33,7 +31,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
-    if (isSmallEnough && isLargeEnough) visited->push_back(node);
+    if (isSmallEnough && isLargeEnough && node->isVisible()) visited->push_back(node);
 }
 
 void centralizeAnchorPoint(CCNode* node) {

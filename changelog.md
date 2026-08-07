@@ -1,3 +1,7 @@
+# 0.1.1
+- More robust node selection by not including nodes which have zero size
+    - Thanks to @lunarawa on discord for finding this
+
 # 0.1.0
 - Migrate to v3.1.0 of box2d
 - More robust layer resolution
