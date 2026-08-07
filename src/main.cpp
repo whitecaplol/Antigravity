@@ -20,21 +20,20 @@ bool is_any_of(CCNode* node) {
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
-    bool isCorrectType = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
+    auto isCorrectType = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
         CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node);
-    bool isSmallEnough = node->getScaledContentHeight() < winSize.height &&
-        node->getScaledContentWidth() < winSize.width;
 
-    if (isCorrectType && isSmallEnough) {
-        visited->push_back(node);
-        return;
-    } else if (isCorrectType && !isSmallEnough) {
+    if (!isCorrectType) {
+        for (CCNode* child : node->getChildrenExt()) {
+            collectDescendants(child, visited, winSize);
+        }
         return;
     }
 
-    for (CCNode* child : node->getChildrenExt()) {
-        collectDescendants(child, visited, winSize);
-    }
+    auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
+    auto isSmallEnough = height < winSize.height && width < winSize.width;
+    auto isLargeEnough = width > 0 && height > 0;
+    if (isSmallEnough && isLargeEnough) visited->push_back(node);
 }
 
 void centralizeAnchorPoint(CCNode* node) {
@@ -180,7 +179,7 @@ class $modify(AntigravityLayer, CCLayer) {
     }
 };
 
-#include<Geode/modify/CCDirector.hpp>
+#include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
     void willSwitchToScene(CCScene* scene) {
         CCDirector::willSwitchToScene(scene);
