@@ -22,7 +22,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
 
     if (!is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
         CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node)) {
-        for (CCNode* child : node->getChildrenExt()) {
+        for (auto child : node->getChildrenExt()) {
             collectDescendants(child, visited, winSize);
         }
         return;
@@ -41,11 +41,8 @@ void centralizeAnchorPoint(CCNode* node) {
 }
 
 float getAbsoluteRotation(CCNode* node) {
-    float rotation = 0.0f;
-    while (node) {
-        rotation += node->getRotation();
-        node = node->getParent();
-    }
+    auto rotation = 0.0f;
+    do rotation += node->getRotation(); while ((node = node->getParent()));
     return clampf(rotation, -180.0f, 180.0f);
 }
 
@@ -56,7 +53,7 @@ class $modify(AntigravityLayer, CCLayer) {
         b2WorldId worldId;
 
         Fields() {
-            b2WorldDef worldDef = b2DefaultWorldDef();
+            auto worldDef = b2DefaultWorldDef();
             worldDef.gravity = {0.0f, -9.8f};
             worldId = b2CreateWorld(&worldDef);
         }
@@ -104,14 +101,14 @@ class $modify(AntigravityLayer, CCLayer) {
         auto halfSize = node->getScaledContentSize() * 0.5f;
         auto position = node->convertToWorldSpace(halfSize);
 
-        b2BodyDef bodyDef = b2DefaultBodyDef();
+        auto bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
         bodyDef.position = {position.x, position.y};
         bodyDef.rotation = b2MakeRot(CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node)));
 
         auto bodyId = b2CreateBody(m_fields->worldId, &bodyDef);
 
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
+        auto shapeDef = b2DefaultShapeDef();
         if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
             shapeDef.density = opacityNode->getOpacity() / 255.0f;
         }
