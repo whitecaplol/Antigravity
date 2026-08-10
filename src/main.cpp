@@ -1,27 +1,45 @@
-#include <Geode/Geode.hpp>
 #include <box2d/box2d.h>
 
 using namespace geode::prelude;
 
 constexpr float halfThickness = 1.0f;
 
-std::random_device rd;
-std::mt19937 gen(rd());
-
-std::uniform_real_distribution<float> forceX(-1.0f, 1.0f);
-std::uniform_real_distribution<float> forceY(0.0f, 5.0f);
-std::uniform_real_distribution<float> torque(-1.0f, 1.0f);
-
 template <typename... Types>
 bool is_any_of(CCNode* node) {
     return (... || typeinfo_cast<Types>(node));
 }
 
+bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
+    auto boundingBox = node->boundingBox();
+    auto origin = boundingBox.origin;
+    if (node->getParent()) {
+        origin = node->getParent()->convertToWorldSpace(origin);
+    }
+    auto left = origin.x;
+    auto right = origin.x + boundingBox.getMaxX();
+    auto bottom = origin.y;
+    auto top = origin.y + boundingBox.getMaxY();
+    return left < winSize.width && right > 0 && bottom < winSize.height && top > 0;
+}
+
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
-    if (!is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*,
-        CCSprite*, CCMenuItemToggler*, Slider*, CCScale9Sprite*>(node)) {
+    if (is_any_of<TextArea*>(node)) {
+        while (node) {
+            node = node->getChildByIndex(0);
+            if (is_any_of<CCLabelBMFont*>(node)) {
+                visited->push_back(node);
+                break;
+            }
+        }
+        return;
+    }
+
+
+    if (!is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*, CCSprite*,
+        CCMenuItemToggler*, Slider*, CCScale9Sprite*, CCLayerColor*>(node) ||
+        is_any_of<SimplePlayer*>(node)) {
         for (auto child : node->getChildrenExt()) {
             collectDescendants(child, visited, winSize);
         }
@@ -31,7 +49,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
-    if (isSmallEnough && isLargeEnough && node->isVisible()) visited->push_back(node);
+    if (isSmallEnough && isLargeEnough && node->isVisible() && nodeIsInsideViewport(node, winSize)) visited->push_back(node);
 }
 
 void centralizeAnchorPoint(CCNode* node) {
@@ -42,14 +60,21 @@ void centralizeAnchorPoint(CCNode* node) {
 
 float getAbsoluteRotation(CCNode* node) {
     auto rotation = 0.0f;
-    do rotation += node->getRotation(); while ((node = node->getParent()));
+    while (node) {
+        rotation += node->getRotation();
+        node = node->getParent();
+    }
     return clampf(rotation, -180.0f, 180.0f);
+}
+
+void setAbsoluteRotation(CCNode* node, float angle) {
+    node->setRotation(angle - getAbsoluteRotation(node->getParent()));
 }
 
 #include <Geode/modify/CCLayer.hpp>
 class $modify(AntigravityLayer, CCLayer) {
     struct Fields {
-        std::unordered_map<CCNode*, b2BodyId>* maps = new std::unordered_map<CCNode*, b2BodyId>();
+        std::unordered_map<CCNode*, b2BodyId> maps;
         b2WorldId worldId;
 
         Fields() {
@@ -59,9 +84,6 @@ class $modify(AntigravityLayer, CCLayer) {
         }
 
         ~Fields() {
-            delete maps;
-            maps = nullptr;
-
             b2DestroyWorld(worldId);
             worldId = b2_nullWorldId;
         }
@@ -113,25 +135,24 @@ class $modify(AntigravityLayer, CCLayer) {
             shapeDef.density = opacityNode->getOpacity() / 255.0f;
         }
 
-        auto leftBox = b2MakeOffsetBox(halfThickness, halfSize.height, {-(halfSize.width-halfThickness), 0}, b2Rot_identity);
-        b2CreatePolygonShape(bodyId, &shapeDef, &leftBox);
+        if (is_any_of<CircleButtonSprite*, LoadingCircleSprite*>(node)) {
+            b2Circle circle = {{0.0f, 0.0f}, 0.5f * (halfSize.width + halfSize.height)};
+            b2CreateCircleShape(bodyId, &shapeDef, &circle);
+        } else {
+            auto leftBox = b2MakeOffsetBox(halfThickness, halfSize.height, {-(halfSize.width-halfThickness), 0}, b2Rot_identity);
+            b2CreatePolygonShape(bodyId, &shapeDef, &leftBox);
 
-        auto rightBox = b2MakeOffsetBox(halfThickness, halfSize.height, {(halfSize.width-halfThickness), 0}, b2Rot_identity);
-        b2CreatePolygonShape(bodyId, &shapeDef, &rightBox);
+            auto rightBox = b2MakeOffsetBox(halfThickness, halfSize.height, {(halfSize.width-halfThickness), 0}, b2Rot_identity);
+            b2CreatePolygonShape(bodyId, &shapeDef, &rightBox);
 
-        auto upBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, (halfSize.height-halfThickness)}, b2Rot_identity);
-        b2CreatePolygonShape(bodyId, &shapeDef, &upBox);
+            auto upBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, (halfSize.height-halfThickness)}, b2Rot_identity);
+            b2CreatePolygonShape(bodyId, &shapeDef, &upBox);
 
-        auto downBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, -(halfSize.height-halfThickness)}, b2Rot_identity);
-        b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
+            auto downBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, -(halfSize.height-halfThickness)}, b2Rot_identity);
+            b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
+        }
 
-        auto normalizedWeight = halfSize.height / winSize.height * halfSize.width / winSize.width;
-
-        b2Body_ApplyLinearImpulseToCenter(bodyId, {forceX(gen) * normalizedWeight, forceY(gen) * normalizedWeight}, true);
-        b2Body_ApplyAngularImpulse(bodyId, torque(gen) * normalizedWeight, true);
-
-        m_fields->maps->insert_or_assign(node, bodyId);
-        log::debug("Created a body definition at {}, {}", position.x, position.y);
+        m_fields->maps.insert_or_assign(node, bodyId);
     }
 
     void step(float dt) {
@@ -141,30 +162,28 @@ class $modify(AntigravityLayer, CCLayer) {
         collectDescendants(this, &nodes, winSize);
 
         std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
-        std::erase_if(*m_fields->maps, [&lookup](const auto& pair) {
+        std::erase_if(m_fields->maps, [&lookup](const auto& pair) {
             if (lookup.contains(pair.first)) return false;
             b2DestroyBody(pair.second);
             return true;
         });
 
         for (auto node : nodes) {
-            if (!m_fields->maps->contains(node)) {
+            if (!m_fields->maps.contains(node)) {
                 setUpPhysics(node, winSize);
             }
         }
 
         b2World_Step(m_fields->worldId, dt, 4);
         for (auto node : nodes) {
-            if (!m_fields->maps->contains(node)) continue;
-            auto bodyId = m_fields->maps->at(node);
-            auto position = b2Body_GetPosition(m_fields->maps->at(node));
+            if (!m_fields->maps.contains(node)) continue;
+            auto bodyId = m_fields->maps.at(node);
+            auto position = b2Body_GetPosition(m_fields->maps.at(node));
             auto rotation = -CC_RADIANS_TO_DEGREES(b2Rot_GetAngle(b2Body_GetRotation(bodyId)));
             node->setPosition(
-                (node->getParent()) ?
-                node->getParent()->convertToNodeSpace({position.x, position.y}) :
-                ccp(position.x, position.y)
+                node->getParent()->convertToNodeSpace({position.x, position.y})
             );
-            node->setRotation(rotation);
+            setAbsoluteRotation(node, rotation);
         }
     }
 
