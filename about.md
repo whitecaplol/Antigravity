@@ -21,7 +21,5 @@ Adds physics (why not?)
 Currently, consists of some of the following:
 - Not ready for prod
 - Doesn't disable itself in-game (which is, well, important).
-- No preservation of velocities (yet)
 - Bounding boxes are not adjusted when the node is resized
 - Out of frame objects may still do physics (notable example includes the main level selector page).
-- No proper snap-backs of positions when an element is modified.

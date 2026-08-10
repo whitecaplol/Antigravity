@@ -4,11 +4,17 @@ using namespace geode::prelude;
 
 constexpr float halfThickness = 0.25f;
 
+struct PriorData {
+    CCPoint position;
+    float angle;
+};
+
 template <typename... Types>
 bool is_any_of(CCNode* node) {
     return (... || typeinfo_cast<Types>(node));
 }
 
+// TODO: Improve
 bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
     auto boundingBox = node->boundingBox();
     auto origin = boundingBox.origin;
@@ -19,7 +25,7 @@ bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
     auto right = origin.x + boundingBox.size.width;
     auto bottom = origin.y;
     auto top = origin.y + boundingBox.size.height;
-    return left < winSize.width && right > 0 && bottom < winSize.height && top > 0;
+    return left <= winSize.width && right >= 0 && bottom <= winSize.height && top >= 0;
 }
 
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
@@ -36,26 +42,29 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-
-    if (!is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*, CCSprite*,
-        CCMenuItemToggler*, Slider*, CCScale9Sprite*, CCLayerColor*>(node) ||
-        is_any_of<SimplePlayer*>(node)) {
-        for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize);
-        }
-        return;
-    }
-
+    auto isValid = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*, CCSprite*,
+        CCMenuItemToggler*, CCControlSlider*, CCLayerColor*, CCScale9Sprite*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
-    if (isSmallEnough && isLargeEnough && node->isVisible() && nodeIsInsideViewport(node, winSize)) visited->push_back(node);
+    if (isValid && isSmallEnough && isLargeEnough && node->isVisible() && nodeIsInsideViewport(node, winSize)) {
+        visited->push_back(node);
+        return;
+    }
+
+    for (auto child : node->getChildrenExt()) {
+        collectDescendants(child, visited, winSize);
+    }
 }
 
 void centralizeAnchorPoint(CCNode* node) {
     auto oldAnchor = node->getAnchorPoint();
-    node->setPosition(node->getPosition() + ccp((0.5 - oldAnchor.x) * node->getContentWidth(), (0.5 - oldAnchor.y) * node->getContentHeight()));
+    node->setPosition(node->getPosition() + ccp((0.5 - oldAnchor.x) * node->getScaledContentWidth(), (0.5 - oldAnchor.y) * node->getScaledContentHeight()));
     node->setAnchorPoint({0.5, 0.5});
+}
+
+CCPoint getAbsolutePosition(CCNode* node) {
+    return node->convertToWorldSpace({node->getScaledContentWidth() / 2, node->getScaledContentHeight() / 2});
 }
 
 float getAbsoluteRotation(CCNode* node) {
@@ -71,9 +80,10 @@ void setAbsoluteRotation(CCNode* node, float angle) {
     node->setRotation(angle - getAbsoluteRotation(node->getParent()));
 }
 
-#include <Geode/modify/CCLayer.hpp>
-class $modify(AntigravityLayer, CCLayer) {
+#include <Geode/modify/CCNode.hpp>
+class $modify(AntigravityContainer, CCNode) {
     struct Fields {
+        std::unordered_map<CCNode*, PriorData> candidateMaps;
         std::unordered_map<CCNode*, b2BodyId> maps;
         b2WorldId worldId = b2_nullWorldId;
 
@@ -93,7 +103,7 @@ class $modify(AntigravityLayer, CCLayer) {
         }
 
         setUpWorldBorder(winSize);
-        schedule(schedule_selector(AntigravityLayer::step));
+        schedule(schedule_selector(AntigravityContainer::step));
 
         return true;
     }
@@ -113,7 +123,7 @@ class $modify(AntigravityLayer, CCLayer) {
         b2CreateChain(borderBodyId, &chainDef);
     }
 
-    void setUpPhysics(CCNode* node, CCSize& winSize) {
+    void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0, 0}, float angularVelocity = 0.0f) {
         if (!node) return;
 
         centralizeAnchorPoint(node);
@@ -150,6 +160,9 @@ class $modify(AntigravityLayer, CCLayer) {
             b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
         }
 
+        b2Body_ApplyLinearImpulseToCenter(bodyId, velocity, true);
+        b2Body_ApplyAngularImpulse(bodyId, angularVelocity, true);
+
         m_fields->maps.insert_or_assign(node, bodyId);
     }
 
@@ -168,9 +181,21 @@ class $modify(AntigravityLayer, CCLayer) {
             return true;
         });
 
+        std::erase_if(m_fields->candidateMaps, [&lookup](const auto& pair) {
+            return !lookup.contains(pair.first);
+        });
+
         for (auto node : nodes) {
-            if (!m_fields->maps.contains(node)) {
-                setUpPhysics(node, winSize);
+            if (m_fields->maps.contains(node)) continue; // TODO for future: Update boxes as needed.
+            if (m_fields->candidateMaps.contains(node)) {
+                auto prior = m_fields->candidateMaps[node];
+                auto velocity = (getAbsolutePosition(node) - prior.position) / dt;
+                auto angularVelocity = -(getAbsoluteRotation(node) - prior.angle) / dt;
+                setUpPhysics(node, winSize, {velocity.x, velocity.y}, angularVelocity);
+                m_fields->candidateMaps.erase(node);
+            } else {
+                PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
+                m_fields->candidateMaps.insert_or_assign(node, data);
             }
         }
 
@@ -188,26 +213,38 @@ class $modify(AntigravityLayer, CCLayer) {
     }
 
     void onExit() {
-        unschedule(schedule_selector(AntigravityLayer::step));
-        CCLayer::onExit();
+        unschedule(schedule_selector(AntigravityContainer::step));
+        CCNode::onExit();
     }
 };
 
+// Because CCDirectors do not support fields
+std::unordered_set<AntigravityContainer*> activeLayers;
+
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
-    void willSwitchToScene(CCScene* scene) {
-        CCDirector::willSwitchToScene(scene);
-
+    void drawScene() {
+        CCDirector::drawScene();
         if (!Mod::get()->getSettingValue<bool>("enabled")) return;
 
-        for (auto child : scene->getChildrenExt()) {
-            if (auto layer = typeinfo_cast<CCLayer*>(child)) {
-                static_cast<AntigravityLayer*>(layer)->initPhysics(
-                    getWinSize(),
-                    Mod::get()->getSettingValue<float>("gravity-x"),
-                    Mod::get()->getSettingValue<float>("gravity-y")
-                );
-            }
+        auto winSize = getWinSize();
+
+        auto children = getRunningScene()->getChildrenExt();
+        std::unordered_set<CCNode*> current(children.begin(), children.end());
+
+        std::erase_if(activeLayers, [&current](const auto& item) {
+            return current.find(item) == current.end();
+        });
+
+        for (auto child : children) {
+            auto agContainer = static_cast<AntigravityContainer*>(child);
+            if (activeLayers.contains(agContainer)) continue;
+            agContainer->initPhysics(
+                winSize,
+                Mod::get()->getSettingValue<float>("gravity-x"),
+                Mod::get()->getSettingValue<float>("gravity-y")
+            );
+            activeLayers.insert(agContainer);
         }
     }
 };

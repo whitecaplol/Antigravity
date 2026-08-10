@@ -1,5 +1,5 @@
 {
-	"geode": "5.8.2",
+	"geode": "5.9.0",
 	"gd": {
 		"win": "2.2081",
 		"android": "2.2081",
@@ -8,7 +8,7 @@
 	},
 	"id": "whitecaplol.antigravity",
 	"name": "Antigravity",
-	"version": "v0.1.1",
+	"version": "v0.2.0",
 	"developer": "whitecaplol",
 	"description": "Adds gravity to any arbitrary UI element",
 	"dependencies": {},

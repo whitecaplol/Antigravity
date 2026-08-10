@@ -1,3 +1,8 @@
+# 0.2.0
+- Velocities are preserved
+- Settings
+- Even more robust layer identification.
+
 # 0.1.1
 - More robust node selection by not including nodes which have zero size
     - Thanks to @lunarawa on discord for finding this
