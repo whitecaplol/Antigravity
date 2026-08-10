@@ -14,14 +14,14 @@
 	"dependencies": {},
 	"settings": {
 		"enabled": {
-			"type": "boolean",
+			"type": "bool",
 			"name": "Enable Antigravity",
 			"description": "Adds gravity to most UI elements",
 			"default": true
 		},
 		"enable-everywhere": {
 			"enable-if": "enabled",
-			"type": "boolean",
+			"type": "bool",
 			"name": "Enable everywhere",
 			"description": "Adds gravity to all UI elements, including in-game and in-editor (Dangerous)",
 			"default": false

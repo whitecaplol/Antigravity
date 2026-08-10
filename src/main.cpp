@@ -2,7 +2,7 @@
 
 using namespace geode::prelude;
 
-constexpr float halfThickness = 1.0f;
+constexpr float halfThickness = 0.25f;
 
 template <typename... Types>
 bool is_any_of(CCNode* node) {
@@ -16,9 +16,9 @@ bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
         origin = node->getParent()->convertToWorldSpace(origin);
     }
     auto left = origin.x;
-    auto right = origin.x + boundingBox.getMaxX();
+    auto right = origin.x + boundingBox.size.width;
     auto bottom = origin.y;
-    auto top = origin.y + boundingBox.getMaxY();
+    auto top = origin.y + boundingBox.size.height;
     return left < winSize.width && right > 0 && bottom < winSize.height && top > 0;
 }
 
@@ -75,23 +75,21 @@ void setAbsoluteRotation(CCNode* node, float angle) {
 class $modify(AntigravityLayer, CCLayer) {
     struct Fields {
         std::unordered_map<CCNode*, b2BodyId> maps;
-        b2WorldId worldId;
-
-        Fields() {
-            auto worldDef = b2DefaultWorldDef();
-            worldDef.gravity = {0.0f, -9.8f};
-            worldId = b2CreateWorld(&worldDef);
-        }
+        b2WorldId worldId = b2_nullWorldId;
 
         ~Fields() {
-            b2DestroyWorld(worldId);
+            if (b2World_IsValid(worldId)) b2DestroyWorld(worldId);
             worldId = b2_nullWorldId;
         }
     };
 
-    bool initPhysics(CCSize winSize) {
+    bool initPhysics(CCSize winSize, float gravityX = 0.0f, float gravityY = 0.0f) {
+        auto worldDef = b2DefaultWorldDef();
+        worldDef.gravity = {gravityX, gravityY};
+        m_fields->worldId = b2CreateWorld(&worldDef);
+
         if (!b2World_IsValid(m_fields->worldId)) {
-            return true;
+            return false;
         }
 
         setUpWorldBorder(winSize);
@@ -156,6 +154,8 @@ class $modify(AntigravityLayer, CCLayer) {
     }
 
     void step(float dt) {
+        if (!b2World_IsValid(m_fields->worldId)) return;
+
         auto winSize = CCDirector::sharedDirector()->getWinSize();
         std::vector<CCNode*> nodes;
 
@@ -197,9 +197,16 @@ class $modify(AntigravityLayer, CCLayer) {
 class $modify(CCDirector) {
     void willSwitchToScene(CCScene* scene) {
         CCDirector::willSwitchToScene(scene);
+
+        if (!Mod::get()->getSettingValue<bool>("enabled")) return;
+
         for (auto child : scene->getChildrenExt()) {
             if (auto layer = typeinfo_cast<CCLayer*>(child)) {
-                static_cast<AntigravityLayer*>(layer)->initPhysics(getWinSize());
+                static_cast<AntigravityLayer*>(layer)->initPhysics(
+                    getWinSize(),
+                    Mod::get()->getSettingValue<float>("gravity-x"),
+                    Mod::get()->getSettingValue<float>("gravity-y")
+                );
             }
         }
     }
