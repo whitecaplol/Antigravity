@@ -2,7 +2,7 @@
 
 using namespace geode::prelude;
 
-constexpr float halfThickness = 0.25f;
+constexpr float halfThickness = 0.5f;
 
 struct PriorData {
     CCPoint position;
@@ -14,7 +14,6 @@ bool is_any_of(CCNode* node) {
     return (... || typeinfo_cast<Types>(node));
 }
 
-// TODO: Improve
 bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
     auto boundingBox = node->boundingBox();
     auto origin = boundingBox.origin;
@@ -31,19 +30,8 @@ bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
-    if (is_any_of<TextArea*>(node)) {
-        while (node) {
-            node = node->getChildByIndex(0);
-            if (is_any_of<CCLabelBMFont*>(node)) {
-                visited->push_back(node);
-                break;
-            }
-        }
-        return;
-    }
-
     auto isValid = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*, CCSprite*,
-        CCMenuItemToggler*, CCControlSlider*, CCLayerColor*, CCScale9Sprite*>(node);
+        CCMenuItemToggler*, Slider*, CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
@@ -129,7 +117,7 @@ class $modify(AntigravityContainer, CCNode) {
         centralizeAnchorPoint(node);
 
         auto halfSize = node->getScaledContentSize() * 0.5f;
-        auto position = node->convertToWorldSpace(halfSize);
+        auto position = node->convertToWorldSpaceAR(CCPointZero);
 
         auto bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
@@ -225,7 +213,9 @@ std::unordered_set<AntigravityContainer*> activeLayers;
 class $modify(CCDirector) {
     void drawScene() {
         CCDirector::drawScene();
-        if (!Mod::get()->getSettingValue<bool>("enabled")) return;
+
+        auto mod = Mod::get();
+        if (!mod->getSettingValue<bool>("enabled")) return;
 
         auto winSize = getWinSize();
 
@@ -237,12 +227,13 @@ class $modify(CCDirector) {
         });
 
         for (auto child : children) {
+            if (!mod->getSettingValue<bool>("enable-everywhere") && is_any_of<PlayLayer*, LevelEditorLayer*>(child)) continue;
             auto agContainer = static_cast<AntigravityContainer*>(child);
             if (activeLayers.contains(agContainer)) continue;
             agContainer->initPhysics(
                 winSize,
-                Mod::get()->getSettingValue<float>("gravity-x"),
-                Mod::get()->getSettingValue<float>("gravity-y")
+                mod->getSettingValue<float>("gravity-x"),
+                mod->getSettingValue<float>("gravity-y")
             );
             activeLayers.insert(agContainer);
         }
