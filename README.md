@@ -12,7 +12,7 @@ Makes any UI have gravity (how ironic)
 Adds physics (why not?)
 - Agnostic to any UI layer. In other words: It should work regardless of if it's RobTop's menus or some mod's strange UI.
     - Currently works, but all anchor points are adjusted. This may cause issues if some UI element really relies on it.
-- Tunable (soon)
+- Tunable
 
 ## Dependencies
 [`box2d`](https://box2d.org/) (For physics)
@@ -22,6 +22,6 @@ Adds physics (why not?)
 
 Currently, consists of some of the following:
 - Not ready for prod
-- Doesn't disable itself in-game (which is, well, important).
 - Bounding boxes are not adjusted when the node is resized
-- No proper snap-backs of positions when an element is modified.
+- Nodes shouldn't have physics until its borders don't touch surrounding borders
+- Layered worlds aren't perfect yet

@@ -1,3 +1,8 @@
+# 0.2.1
+- Slightly better node identification
+- Better anchor point corrections
+- More oomph to nodes that animate in or out.
+
 # 0.2.0
 - Velocities are preserved
 - Settings

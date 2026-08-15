@@ -30,8 +30,13 @@ bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
-    auto isValid = is_any_of<CCMenuItemSpriteExtra*, CCLabelBMFont*, CCSprite*,
-        CCMenuItemToggler*, Slider*, CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*>(node);
+    if (is_any_of<CCMenuItemSpriteExtra*>(node)) {
+        visited->push_back(node);
+        return;
+    }
+
+    auto isValid = is_any_of<CCLabelBMFont*, CCSprite*, CCMenuItemToggler*, Slider*,
+        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
@@ -45,14 +50,18 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 }
 
-void centralizeAnchorPoint(CCNode* node) {
-    auto oldAnchor = node->getAnchorPoint();
-    node->setPosition(node->getPosition() + ccp((0.5 - oldAnchor.x) * node->getScaledContentWidth(), (0.5 - oldAnchor.y) * node->getScaledContentHeight()));
-    node->setAnchorPoint({0.5, 0.5});
+CCPoint getAbsolutePosition(CCNode* node) {
+    return node->convertToWorldSpace(node->getContentSize() * 0.5);
 }
 
-CCPoint getAbsolutePosition(CCNode* node) {
-    return node->convertToWorldSpace({node->getScaledContentWidth() / 2, node->getScaledContentHeight() / 2});
+void centralizeAnchorPoint(CCNode* node) {
+    auto oldAnchor = node->getAnchorPoint();
+    if (node->isIgnoreAnchorPointForPosition()) {
+        node->ignoreAnchorPointForPosition(false);
+        node->setAnchorPoint({0, 0});
+    }
+    node->setPosition(node->getParent()->convertToNodeSpace(getAbsolutePosition(node)));
+    node->setAnchorPoint({0.5, 0.5});
 }
 
 float getAbsoluteRotation(CCNode* node) {
@@ -148,8 +157,9 @@ class $modify(AntigravityContainer, CCNode) {
             b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
         }
 
-        b2Body_ApplyLinearImpulseToCenter(bodyId, velocity, true);
-        b2Body_ApplyAngularImpulse(bodyId, angularVelocity, true);
+        auto mass = b2Body_GetMass(bodyId);
+        b2Body_ApplyLinearImpulseToCenter(bodyId, mass * velocity, true);
+        b2Body_ApplyAngularImpulse(bodyId, mass * angularVelocity, true);
 
         m_fields->maps.insert_or_assign(node, bodyId);
     }
