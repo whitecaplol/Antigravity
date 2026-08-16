@@ -15,6 +15,8 @@ bool is_any_of(CCNode* node) {
 }
 
 bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
+    if (!node) return false;
+
     auto boundingBox = node->boundingBox();
     auto origin = boundingBox.origin;
     if (node->getParent()) {
@@ -51,11 +53,12 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
 }
 
 CCPoint getAbsolutePosition(CCNode* node) {
+    if (!node) return CCPointZero;
     return node->convertToWorldSpace(node->getContentSize() * 0.5);
 }
 
 void centralizeAnchorPoint(CCNode* node) {
-    auto oldAnchor = node->getAnchorPoint();
+    if (!node) return;
     if (node->isIgnoreAnchorPointForPosition()) {
         node->ignoreAnchorPointForPosition(false);
         node->setAnchorPoint({0, 0});
@@ -74,6 +77,7 @@ float getAbsoluteRotation(CCNode* node) {
 }
 
 void setAbsoluteRotation(CCNode* node, float angle) {
+    if (!node) return;
     node->setRotation(angle - getAbsoluteRotation(node->getParent()));
 }
 

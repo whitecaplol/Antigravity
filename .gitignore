@@ -63,5 +63,6 @@ build-*/
 .idea/
 /cmake-build-*/
 
-# compile_commands.json for Zed
+# Zed
+.zed/
 compile_commands.json
