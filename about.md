@@ -5,6 +5,7 @@
 
 Makes any UI have gravity (how ironic)
 - Doesn't matter what it is or what source it came from.
+- This differs from other physics-based mods that, to the best of my knowledge, only work on a subset of the game's UI.
 
 ## Features
 Adds physics (why not?)
@@ -20,6 +21,5 @@ Adds physics (why not?)
 
 Currently, consists of some of the following:
 - Not ready for prod
-- Bounding boxes are not adjusted when the node is resized
-- Nodes shouldn't have physics until its borders don't touch surrounding borders
-- Layered worlds aren't perfect yet
+- Bounding boxes are not fine-grained
+- Highly complex UI scenes aren't perfect yet

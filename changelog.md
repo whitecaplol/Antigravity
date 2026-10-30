@@ -1,3 +1,7 @@
+# 0.3.0
+- More robust
+- Potentially ready for showcasing.
+
 # 0.2.1
 - Slightly better node identification
 - Better anchor point corrections
