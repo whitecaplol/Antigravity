@@ -1,3 +1,6 @@
+# 0.3.1
+- Better viewport containment checks
+
 # 0.3.0
 - More robust
 - Potentially ready for showcasing.

@@ -20,6 +20,5 @@ Adds physics (why not?)
 (or a roadmap)
 
 Currently, consists of some of the following:
-- Not ready for prod
-- Bounding boxes are not fine-grained
-- Highly complex UI scenes aren't perfect yet
+- Refinements in node selection necessary
+- Highly complex, layered scenes may not be perfect.

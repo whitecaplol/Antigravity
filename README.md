@@ -21,7 +21,5 @@ Adds physics (why not?)
 (or a roadmap)
 
 Currently, consists of some of the following:
-- Not ready for prod
-- Bounding boxes are not adjusted when the node is resized
-- Nodes shouldn't have physics until its borders don't touch surrounding borders
-- Layered worlds aren't perfect yet
+- Refinements in node selection necessary
+- Highly complex, layered scenes may not be perfect.

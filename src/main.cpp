@@ -2,7 +2,8 @@
 
 using namespace geode::prelude;
 
-constexpr float halfThickness = 0.5f;
+constexpr float ptmRatio = 32.0f;
+constexpr float halfThickness = 0.5f / ptmRatio;
 
 struct PriorData {
     CCPoint position;
@@ -22,12 +23,15 @@ CCPoint getAbsolutePosition(CCNode* node) {
 bool nodeIsInsideViewport(CCNode* node, CCSize& winSize) {
     if (!node) return false;
 
-    auto boundingBox = node->boundingBox();
-    auto origin = getAbsolutePosition(node);
-    auto left = origin.x - boundingBox.size.width / 2;
-    auto right = origin.x + boundingBox.size.width / 2;
-    auto bottom = origin.y - boundingBox.size.height / 2;
-    auto top = origin.y + boundingBox.size.height / 2;
+    auto c1 = node->convertToWorldSpace(ccp(0, 0));
+    auto c2 = node->convertToWorldSpace(ccp(node->getContentWidth(), 0));
+    auto c3 = node->convertToWorldSpace(node->getContentSize());
+    auto c4 = node->convertToWorldSpace(ccp(0, node->getContentHeight()));
+
+    auto left = fmin(fmin(c1.x, c2.x), fmin(c3.x, c4.x));
+    auto right = fmax(fmax(c1.x, c2.x), fmax(c3.x, c4.x));
+    auto bottom = fmin(fmin(c1.y, c2.y), fmin(c3.y, c4.y));
+    auto top = fmax(fmax(c1.y, c2.y), fmax(c3.y, c4.y));
     return left <= winSize.width && right >= 0 && bottom <= winSize.height && top >= 0;
 }
 
@@ -39,14 +43,16 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-    auto isValid = is_any_of<CCLabelBMFont*, CCSprite*, CCMenuItemToggler*, Slider*,
+    auto onlyGetChildren = is_any_of<CCLabelBMFont*>(node);
+    auto shouldAlsoGetChildren = is_any_of<ButtonSprite*>(node);
+    auto isValid = is_any_of<CCFontSprite*, CCSprite*, CCMenuItemToggler*, Slider*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
-    if (isValid && isSmallEnough && isLargeEnough && node->isVisible() && nodeIsInsideViewport(node, winSize)) {
+    if (!onlyGetChildren && (isValid || shouldAlsoGetChildren) && isSmallEnough && isLargeEnough && node->isVisible() && nodeIsInsideViewport(node, winSize)) {
         visited->push_back(node);
-        return;
+        if (!shouldAlsoGetChildren) return;
     }
 
     for (auto child : node->getChildrenExt()) {
@@ -113,7 +119,7 @@ class $modify(AntigravityContainer, CCNode) {
 
         auto borderBodyId = b2CreateBody(m_fields->worldId, &borderBodyDef);
 
-        b2Vec2 vertices[4] = {{0, 0}, {0, winSize.height}, {winSize.width, winSize.height}, {winSize.width, 0}};
+        b2Vec2 vertices[4] = {{0, 0}, {0, winSize.height / ptmRatio}, {winSize.width / ptmRatio, winSize.height / ptmRatio}, {winSize.width / ptmRatio, 0}};
         auto chainDef = b2DefaultChainDef();
         chainDef.points = vertices;
         chainDef.count = 4;
@@ -127,12 +133,12 @@ class $modify(AntigravityContainer, CCNode) {
 
         centralizeAnchorPoint(node);
 
-        auto halfSize = node->getScaledContentSize() * 0.5f;
-        auto position = node->convertToWorldSpaceAR(CCPointZero);
+        auto halfSize = node->getScaledContentSize() * 0.5f / ptmRatio;
+        auto position = getAbsolutePosition(node);
 
         auto bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
-        bodyDef.position = {position.x, position.y};
+        bodyDef.position = {position.x / ptmRatio, position.y / ptmRatio};
         bodyDef.rotation = b2MakeRot(CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node)));
 
         auto bodyId = b2CreateBody(m_fields->worldId, &bodyDef);
@@ -179,7 +185,7 @@ class $modify(AntigravityContainer, CCNode) {
 
         std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
         std::erase_if(m_fields->maps, [this, &lookup, &winSize](const auto& pair) {
-            if (lookup.contains(pair.first)) {
+            if (lookup.contains(pair.first) && nodeIsInsideViewport(pair.first, winSize)) {
                 PriorData expectedData = m_fields->currentMaps[pair.first];
                 if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0) return false;
             }
@@ -199,7 +205,7 @@ class $modify(AntigravityContainer, CCNode) {
                 auto velocity = (getAbsolutePosition(node) - prior.position) / dt;
                 auto angularVelocity = -(getAbsoluteRotation(node) - prior.angle) / dt;
 
-                if (velocity.getLength() > 0 || abs(angularVelocity) > 0) goto update_data; // Sorry
+                if (!m_fields->maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0)) goto update_data; // Sorry
                 setUpPhysics(node, winSize, {0, 0}, 0); // TODO: add optional menu setting here
                 m_fields->candidateMaps.erase(node);
             } else {
@@ -217,7 +223,7 @@ class $modify(AntigravityContainer, CCNode) {
             auto position = b2Body_GetPosition(m_fields->maps.at(node));
             auto rotation = -CC_RADIANS_TO_DEGREES(b2Rot_GetAngle(b2Body_GetRotation(bodyId)));
             node->setPosition(
-                node->getParent()->convertToNodeSpace({position.x, position.y})
+                node->getParent()->convertToNodeSpace({position.x * ptmRatio, position.y * ptmRatio})
             );
             setAbsoluteRotation(node, rotation);
         }
