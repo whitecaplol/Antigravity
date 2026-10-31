@@ -52,19 +52,28 @@ bool nodeIntersectsViewport(CCNode* node, CCSize& winSize) {
 void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize) {
     if (!node) return;
 
+    auto onlyGetChildren = is_any_of<CCLabelBMFont*>(node);
+
+    if (onlyGetChildren) {
+        for (auto child : node->getChildrenExt()) {
+            collectDescendants(child, visited, winSize);
+        }
+        return;
+    }
+
     if (is_any_of<CCMenuItemSpriteExtra*>(node)) {
         visited->push_back(node);
         return;
     }
 
-    auto onlyGetChildren = is_any_of<CCLabelBMFont*>(node);
     auto shouldAlsoGetChildren = is_any_of<ButtonSprite*>(node);
     auto isValid = is_any_of<CCFontSprite*, CCSprite*, CCMenuItemToggler*, Slider*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*>(node);
-    auto width = node->getContentWidth(), height = node->getContentHeight();
+    auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
-    if (!onlyGetChildren && (isValid || shouldAlsoGetChildren) && isSmallEnough && isLargeEnough && node->isVisible() && nodeIsFullyInsideViewport(node, winSize)) {
+
+    if ((isValid || shouldAlsoGetChildren) && isSmallEnough && isLargeEnough && node->isVisible() && nodeIsFullyInsideViewport(node, winSize)) {
         visited->push_back(node);
         if (!shouldAlsoGetChildren) return;
     }
@@ -148,6 +157,10 @@ class $modify(AntigravityContainer, CCNode) {
         centralizeAnchorPoint(node);
 
         auto halfSize = node->getScaledContentSize() * 0.5f;
+        if (is_any_of<CCFontSprite*>(node)) {
+            halfSize *= 0.125f;
+        }
+
         auto position = getAbsolutePosition(node);
 
         auto bodyDef = b2DefaultBodyDef();
