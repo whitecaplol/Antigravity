@@ -107,40 +107,21 @@ void setAbsoluteRotation(CCNode* node, float angle) {
     node->setRotation(angle - getAbsoluteRotation(node->getParent()));
 }
 
-#include <Geode/modify/CCNode.hpp>
-class $modify(AntigravityContainer, CCNode) {
-    struct Fields {
-        std::unordered_map<CCNode*, PriorData> candidateMaps;
-        std::unordered_map<CCNode*, PriorData> currentMaps; // Just to see if something else decided to modify the UI in the meantime.
-        std::unordered_map<CCNode*, b2BodyId> maps;
-        b2WorldId worldId = b2_nullWorldId;
+class AntigravityContext {
+private:
+    std::unordered_map<CCNode*, PriorData> candidateMaps;
+    std::unordered_map<CCNode*, PriorData> currentMaps; // Just to see if something else decided to modify the UI in the meantime.
+    std::unordered_map<CCNode*, b2BodyId> maps;
+    CCNode* root;
+    b2WorldId worldId = b2_nullWorldId;
 
-        ~Fields() {
-            if (b2World_IsValid(worldId)) b2DestroyWorld(worldId);
-            worldId = b2_nullWorldId;
-        }
-    };
-
-    bool initPhysics(CCSize winSize, float gravityX = 0.0f, float gravityY = 0.0f) {
-        auto worldDef = b2DefaultWorldDef();
-        worldDef.gravity = {gravityX, gravityY};
-        m_fields->worldId = b2CreateWorld(&worldDef);
-
-        if (!b2World_IsValid(m_fields->worldId)) {
-            return false;
-        }
-
-        setUpWorldBorder(winSize);
-        schedule(schedule_selector(AntigravityContainer::step));
-
-        return true;
-    }
+    AntigravityContext(CCNode* root, b2WorldId worldId) : root(root), worldId(worldId) {}
 
     void setUpWorldBorder(CCSize& winSize) {
         auto borderBodyDef = b2DefaultBodyDef();
         borderBodyDef.type = b2_staticBody;
 
-        auto borderBodyId = b2CreateBody(m_fields->worldId, &borderBodyDef);
+        auto borderBodyId = b2CreateBody(worldId, &borderBodyDef);
 
         b2Vec2 vertices[4] = {{0, 0}, {0, winSize.height}, {winSize.width, winSize.height}, {winSize.width, 0}};
         auto chainDef = b2DefaultChainDef();
@@ -150,6 +131,21 @@ class $modify(AntigravityContainer, CCNode) {
 
         b2CreateChain(borderBodyId, &chainDef);
     }
+public:
+    static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f) {
+        auto worldDef = b2DefaultWorldDef();
+        worldDef.gravity = {gravityX, gravityY};
+        auto worldId = b2CreateWorld(&worldDef);
+
+        if (!b2World_IsValid(worldId)) {
+            return nullptr;
+        }
+
+        AntigravityContext* object = new AntigravityContext(root, worldId);
+        object->setUpWorldBorder(winSize);
+
+        return object;
+    }
 
     void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0, 0}, float angularVelocity = 0.0f) {
         if (!node) return;
@@ -158,7 +154,7 @@ class $modify(AntigravityContainer, CCNode) {
 
         auto halfSize = node->getScaledContentSize() * 0.5f;
         if (is_any_of<CCFontSprite*>(node)) {
-            halfSize *= 0.125f;
+            halfSize *= 0.2f;
         }
 
         auto position = getAbsolutePosition(node);
@@ -168,7 +164,7 @@ class $modify(AntigravityContainer, CCNode) {
         bodyDef.position = {position.x, position.y};
         bodyDef.rotation = b2MakeRot(CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node)));
 
-        auto bodyId = b2CreateBody(m_fields->worldId, &bodyDef);
+        auto bodyId = b2CreateBody(worldId, &bodyDef);
 
         auto shapeDef = b2DefaultShapeDef();
         if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
@@ -196,58 +192,58 @@ class $modify(AntigravityContainer, CCNode) {
         b2Body_ApplyLinearImpulseToCenter(bodyId, mass * velocity, true);
         b2Body_ApplyAngularImpulse(bodyId, mass * angularVelocity, true);
 
-        m_fields->maps.insert_or_assign(node, bodyId);
+        maps.insert_or_assign(node, bodyId);
 
         PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
-        m_fields->currentMaps.insert_or_assign(node, data);
+        currentMaps.insert_or_assign(node, data);
     }
 
     void step(float dt) {
-        if (!b2World_IsValid(m_fields->worldId)) return;
+        if (!b2World_IsValid(worldId)) return;
 
         auto winSize = CCDirector::sharedDirector()->getWinSize();
         std::vector<CCNode*> nodes;
 
-        collectDescendants(this, &nodes, winSize);
+        collectDescendants(root, &nodes, winSize);
 
         std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
-        std::erase_if(m_fields->maps, [this, &lookup, &winSize](const auto& pair) {
+        std::erase_if(maps, [this, &lookup, &winSize](const auto& pair) {
             if (lookup.contains(pair.first) && nodeIntersectsViewport(pair.first, winSize)) {
-                PriorData expectedData = m_fields->currentMaps[pair.first];
+                PriorData expectedData = currentMaps[pair.first];
                 if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0) return false;
             }
             b2DestroyBody(pair.second);
-            m_fields->currentMaps.erase(pair.first);
+            currentMaps.erase(pair.first);
             return true;
         });
 
-        std::erase_if(m_fields->candidateMaps, [&lookup](const auto& pair) {
+        std::erase_if(candidateMaps, [&lookup](const auto& pair) {
             return !lookup.contains(pair.first);
         });
 
         for (auto node : nodes) {
-            if (m_fields->maps.contains(node)) continue; // TODO for future: Update boxes as needed.
-            if (m_fields->candidateMaps.contains(node)) {
-                auto prior = m_fields->candidateMaps[node];
+            if (maps.contains(node)) continue; // TODO for future: Update boxes as needed.
+            if (candidateMaps.contains(node)) {
+                auto prior = candidateMaps[node];
                 auto velocity = (getAbsolutePosition(node) - prior.position) / dt;
                 auto angularVelocity = -(getAbsoluteRotation(node) - prior.angle) / dt;
 
-                if (!m_fields->maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0)) goto update_data; // Sorry
+                if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0)) goto update_data; // Sorry
                 setUpPhysics(node, winSize, {0, 0}, 0); // TODO: add optional menu setting here
-                m_fields->candidateMaps.erase(node);
+                candidateMaps.erase(node);
             } else {
                 update_data:
                 PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
-                m_fields->candidateMaps.insert_or_assign(node, data);
+                candidateMaps.insert_or_assign(node, data);
             }
         }
 
-        b2World_Step(m_fields->worldId, dt, 4);
+        b2World_Step(worldId, dt, 4);
 
         for (auto node : nodes) {
-            if (!m_fields->maps.contains(node)) continue;
-            auto bodyId = m_fields->maps.at(node);
-            auto position = b2Body_GetPosition(m_fields->maps.at(node));
+            if (!maps.contains(node)) continue;
+            auto bodyId = maps.at(node);
+            auto position = b2Body_GetPosition(maps.at(node));
             auto rotation = -CC_RADIANS_TO_DEGREES(b2Rot_GetAngle(b2Body_GetRotation(bodyId)));
             node->setPosition(
                 node->getParent()->convertToNodeSpace({position.x, position.y})
@@ -256,20 +252,20 @@ class $modify(AntigravityContainer, CCNode) {
         }
 
         for (auto node : nodes) {
-            if (!m_fields->maps.contains(node)) continue;
+            if (!maps.contains(node)) continue;
             PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
-            m_fields->currentMaps.insert_or_assign(node, data);
+            currentMaps.insert_or_assign(node, data);
         }
     }
 
-    void onExit() {
-        unschedule(schedule_selector(AntigravityContainer::step));
-        CCNode::onExit();
+    ~AntigravityContext() {
+        if (b2World_IsValid(worldId)) b2DestroyWorld(worldId);
+        worldId = b2_nullWorldId;
     }
 };
 
 // Because CCDirectors do not support fields
-std::unordered_set<AntigravityContainer*> activeLayers;
+std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
 
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
@@ -284,20 +280,26 @@ class $modify(CCDirector) {
         auto children = getRunningScene()->getChildrenExt();
         std::unordered_set<CCNode*> current(children.begin(), children.end());
 
-        std::erase_if(activeLayers, [&current](const auto& item) {
-            return current.find(item) == current.end();
+        std::erase_if(activeLayers, [&current](const auto& pair) {
+            if (current.contains(pair.first)) {
+                return false;
+            }
+            delete activeLayers.at(pair.first);
+            return true;
         });
 
         for (auto child : children) {
             if (!mod->getSettingValue<bool>("enable-everywhere") && is_any_of<PlayLayer*, LevelEditorLayer*>(child)) continue;
-            auto agContainer = static_cast<AntigravityContainer*>(child);
-            if (activeLayers.contains(agContainer)) continue;
-            agContainer->initPhysics(
-                winSize,
-                mod->getSettingValue<float>("gravity-x"),
-                mod->getSettingValue<float>("gravity-y")
-            );
-            activeLayers.insert(agContainer);
+            if (activeLayers.contains(child)) {
+                activeLayers[child]->step(getDeltaTime());
+            } else {
+                auto agContainer = AntigravityContext::create(
+                    child, winSize,
+                    mod->getSettingValue<float>("gravity-x"),
+                    mod->getSettingValue<float>("gravity-y")
+                );
+                activeLayers.insert_or_assign(child, agContainer);
+            }
         }
     }
 };

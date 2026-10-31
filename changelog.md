@@ -1,3 +1,7 @@
+# 0.4.0
+- Better text segmentation
+- Refactored to use `AntigravityContext` instead of hooking into *every* `CCNode`
+
 # 0.3.1
 - Better viewport containment checks
 
