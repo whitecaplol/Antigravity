@@ -6,11 +6,7 @@ std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
     void drawScene() {
-        CCDirector::drawScene();
-
         auto mod = Mod::get();
-        if (!mod->getSettingValue<bool>("enabled")) return;
-
         auto winSize = getWinSize();
 
         auto children = getRunningScene()->getChildrenExt();
@@ -24,22 +20,30 @@ class $modify(CCDirector) {
             return true;
         });
 
-        for (auto child : children) {
-            if (!mod->getSettingValue<bool>("enable-everywhere") && is_any_of<PlayLayer*, LevelEditorLayer*>(child)) continue;
-            if (activeLayers.contains(child)) {
-                auto success = activeLayers[child]->step(getDeltaTime());
-                if (!success) {
-                    delete activeLayers.at(child);
-                    activeLayers.erase(child);
+        if (mod->getSettingValue<bool>("enabled")) {
+            for (auto child : children) {
+                if (!mod->getSettingValue<bool>("enable-everywhere") && is_any_of<PlayLayer*, LevelEditorLayer*>(child)) continue;
+                if (activeLayers.contains(child)) {
+                    auto success = activeLayers[child]->step(getDeltaTime());
+                    if (!success) {
+                        delete activeLayers.at(child);
+                        activeLayers.erase(child);
+                    }
+                } else {
+                    auto agContainer = AntigravityContext::create(
+                        child, winSize,
+                        mod->getSettingValue<float>("gravity-x"),
+                        mod->getSettingValue<float>("gravity-y")
+                    );
+                    activeLayers.insert_or_assign(child, agContainer);
                 }
-            } else {
-                auto agContainer = AntigravityContext::create(
-                    child, winSize,
-                    mod->getSettingValue<float>("gravity-x"),
-                    mod->getSettingValue<float>("gravity-y")
-                );
-                activeLayers.insert_or_assign(child, agContainer);
+            }
+        } else {
+            for (const auto& [node, context] : activeLayers) {
+                context->reset();
             }
         }
+
+        CCDirector::drawScene();
     }
 };

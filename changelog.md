@@ -1,3 +1,7 @@
+# 0.4.2
+- Better state reconstruction to ensure that reused elements don't look weird when programs modify things later on.
+- Better understanding of when to cleanup and when not to.
+
 # 0.4.1
 - Code structure changes
 - Marginally better cleanup in case b2Worlds fail mid-way through.

@@ -22,5 +22,4 @@ Adds physics (why not?)
 (or a roadmap)
 
 Currently, consists of some of the following:
-- Nine slices seem to fall apart sometimes.
-- Highly complex, layered scenes may not be perfect.
+- Runs almost anywhere. And I mean almost anywhere. Fine-grained disabling of Antigravity will come soon.

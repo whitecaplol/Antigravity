@@ -9,6 +9,14 @@ struct PriorData {
     float angle;
 };
 
+struct PriorContext {
+    WeakRef<CCNode> ref;
+    CCPoint anchorPoint;
+    CCPoint position;
+    float rotation;
+    bool ignoreAnchorPointForPosition;
+};
+
 template <typename... Types>
 bool is_any_of(CCNode* node) {
     return (... || typeinfo_cast<Types>(node));
@@ -19,10 +27,13 @@ private:
     std::unordered_map<CCNode*, PriorData> candidateMaps;
     std::unordered_map<CCNode*, PriorData> currentMaps; // Just to see if something else decided to modify the UI in the meantime.
     std::unordered_map<CCNode*, b2BodyId> maps;
+    std::unordered_map<CCNode*, PriorContext> priorContext;
     CCNode* root;
+    CCDirector* currentDirector;
     b2WorldId worldId = b2_nullWorldId;
+    bool isEditor;
 
-    AntigravityContext(CCNode* root, b2WorldId worldId) : root(root), worldId(worldId) {}
+    AntigravityContext(CCNode* root, b2WorldId worldId) : root(root), worldId(worldId), isEditor(is_any_of<PlayLayer*, LevelEditorLayer*>(root)) {}
 
     void setUpWorldBorder(CCSize& winSize);
     void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0, 0}, float angularVelocity = 0.0f);
@@ -30,5 +41,7 @@ public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f);
 
     bool step(float dt);
+    void reset();
+
     ~AntigravityContext();
 };
