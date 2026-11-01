@@ -22,7 +22,8 @@ class $modify(CCDirector) {
 
         if (mod->getSettingValue<bool>("enabled")) {
             for (auto child : children) {
-                if (!mod->getSettingValue<bool>("enable-everywhere") && is_any_of<PlayLayer*, LevelEditorLayer*>(child)) continue;
+                if (isAnyOf<PlayLayer*>(child)) continue;
+                if (!mod->getSettingValue<bool>("enable-in-editor") && isAnyOf<LevelEditorLayer*>(child)) continue;
                 if (activeLayers.contains(child)) {
                     auto success = activeLayers[child]->step(getDeltaTime());
                     if (!success) {

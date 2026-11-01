@@ -19,11 +19,11 @@
 			"description": "Adds gravity to most UI elements",
 			"default": true
 		},
-		"enable-everywhere": {
+		"enable-in-editor": {
 			"enable-if": "enabled",
 			"type": "bool",
-			"name": "Enable everywhere",
-			"description": "Adds gravity to all UI elements, including in-game and in-editor (Dangerous)",
+			"name": "Enable in editor",
+			"description": "Adds gravity to editor",
 			"default": false
 		},
 		"gravity-x": {

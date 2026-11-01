@@ -18,8 +18,17 @@ struct PriorContext {
 };
 
 template <typename... Types>
-bool is_any_of(CCNode* node) {
+bool isAnyOf(CCNode* node) {
     return (... || typeinfo_cast<Types>(node));
+}
+
+template <typename T>
+bool isDescendantOfType(CCNode* node) {
+    while (node != nullptr) {
+        if (isAnyOf<T>(node)) return true;
+        node = node->getParent();
+    }
+    return false;
 }
 
 class AntigravityContext {
@@ -33,7 +42,7 @@ private:
     b2WorldId worldId = b2_nullWorldId;
     bool isEditor;
 
-    AntigravityContext(CCNode* root, b2WorldId worldId) : root(root), worldId(worldId), isEditor(is_any_of<PlayLayer*, LevelEditorLayer*>(root)) {}
+    AntigravityContext(CCNode* root, b2WorldId worldId) : root(root), worldId(worldId), isEditor(isAnyOf<LevelEditorLayer*>(root)) {}
 
     void setUpWorldBorder(CCSize& winSize);
     void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0, 0}, float angularVelocity = 0.0f);

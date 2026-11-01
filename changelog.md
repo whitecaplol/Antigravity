@@ -1,3 +1,7 @@
+# 0.4.3
+- First beta release
+- Much more friendly in the editor.
+
 # 0.4.2
 - Better state reconstruction to ensure that reused elements don't look weird when programs modify things later on.
 - Better understanding of when to cleanup and when not to.

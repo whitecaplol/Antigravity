@@ -56,8 +56,18 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     if (!node) return;
 
     if (isEditor) {
-        if (is_any_of<EditorUI*>(node)) return;
-        if (is_any_of<GameObject*, GJGroundLayer*>(node)) {
+        if (isAnyOf<EditorUI*>(node)) return;
+        if (auto ground = typeinfo_cast<GJGroundLayer*>(node)) {
+            if (auto child = node->getChildByType<CCSpriteBatchNode*>()) {
+                if (auto blockContainer = child->getChildByType<CCSprite*>()) {
+                    for (auto child : blockContainer->getChildrenExt()) {
+                        visited->push_back(child);
+                    }
+                }
+            }
+            return;
+        }
+        if (isAnyOf<GameObject*>(node)) {
             visited->push_back(node);
             return;
         }
@@ -67,7 +77,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-    auto onlyGetChildren = is_any_of<CCLabelBMFont*>(node);
+    auto onlyGetChildren = isAnyOf<CCLabelBMFont*>(node);
 
     if (onlyGetChildren) {
         for (auto child : node->getChildrenExt()) {
@@ -76,19 +86,19 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-    if (is_any_of<CCMenuItemSpriteExtra*>(node)) {
+    if (isAnyOf<CCMenuItemSpriteExtra*>(node)) {
         visited->push_back(node);
         return;
     }
 
-    auto shouldAlsoGetChildren = is_any_of<ButtonSprite*>(node);
-    auto isValid = is_any_of<CCSprite*, CCMenuItemToggler*, Slider*,
+    auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
+    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
 
-    auto needOnlyIntersect = is_any_of<CCScale9Sprite*, NineSlice*>(node);
+    auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
 
     if ((isValid || shouldAlsoGetChildren) && isSmallEnough && isLargeEnough && isActuallyVisible(node) && (nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
         visited->push_back(node);
@@ -169,14 +179,14 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     centralizeAnchorPoint(node);
 
     auto halfSize = node->getScaledContentSize() * 0.5f;
-    if (is_any_of<CCFontSprite*>(node)) {
+    if (isAnyOf<CCFontSprite*>(node)) {
         halfSize *= 0.2f;
     }
 
     auto position = getAbsolutePosition(node);
 
     auto bodyDef = b2DefaultBodyDef();
-    bodyDef.type = is_any_of<GJGroundLayer*>(node) ? b2_staticBody : b2_dynamicBody;
+    bodyDef.type = (isEditor && isDescendantOfType<GJGroundLayer*>(node)) ? b2_staticBody : b2_dynamicBody;
     bodyDef.position = {position.x, position.y};
     bodyDef.rotation = b2MakeRot(CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node)));
 
@@ -187,7 +197,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
         shapeDef.density = opacityNode->getOpacity() / 255.0f;
     }
 
-    if (is_any_of<CircleButtonSprite*, LoadingCircleSprite*>(node)) {
+    if (isAnyOf<CircleButtonSprite*, LoadingCircleSprite*>(node)) {
         b2Circle circle = {{0.0f, 0.0f}, 0.5f * (halfSize.width + halfSize.height)};
         b2CreateCircleShape(bodyId, &shapeDef, &circle);
     } else {
@@ -221,7 +231,7 @@ bool AntigravityContext::step(float dt) {
 
     std::erase_if(maps, [this, &winSize](const auto& pair) {
         CCNode* node = pair.first;
-        if (isEditor || (nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node))) {
+        if (nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
             PriorData expectedData = currentMaps[node];
             if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0) return false;
         }
@@ -252,18 +262,24 @@ bool AntigravityContext::step(float dt) {
 
     for (auto node : nodes) {
         if (maps.contains(node)) continue; // TODO for future: Update boxes as needed.
-        if (candidateMaps.contains(node)) {
-            auto prior = candidateMaps[node];
-            auto velocity = (getAbsolutePosition(node) - prior.position) / dt;
-            auto angularVelocity = -(getAbsoluteRotation(node) - prior.angle) / dt;
+        if (!isEditor) {
+            if (candidateMaps.contains(node)) {
+                auto prior = candidateMaps[node];
+                auto velocity = (getAbsolutePosition(node) - prior.position) / dt;
+                auto angularVelocity = -(getAbsoluteRotation(node) - prior.angle) / dt;
 
-            if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0)) goto update_data; // Sorry
-            setUpPhysics(node, winSize, {0, 0}, 0); // TODO: add optional menu setting here
-            candidateMaps.erase(node);
+                if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0)) goto update_data; // Sorry
+                setUpPhysics(node, winSize, {0, 0}, 0); // TODO: add optional menu setting here
+                candidateMaps.erase(node);
+            } else {
+                update_data:
+                PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
+                candidateMaps.insert_or_assign(node, data);
+            }
         } else {
-            update_data:
-            PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
-            candidateMaps.insert_or_assign(node, data);
+            if (!maps.contains(node)) {
+                setUpPhysics(node, winSize, {0, 0}, 0);
+            }
         }
     }
 

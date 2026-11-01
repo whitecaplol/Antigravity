@@ -8,7 +8,7 @@ else()
 endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-project(Antigravity VERSION 1.0.0)
+project(Antigravity VERSION 0.4.3)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
@@ -25,7 +25,6 @@ set(BOX2D_BUILD_TESTBED OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(box2d)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
-
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 if (NOT DEFINED ENV{GEODE_SDK})
