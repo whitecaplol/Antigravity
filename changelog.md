@@ -1,3 +1,7 @@
+# 0.4.1
+- Code structure changes
+- Marginally better cleanup in case b2Worlds fail mid-way through.
+
 # 0.4.0
 - Better text segmentation
 - Refactored to use `AntigravityContext` instead of hooking into *every* `CCNode`

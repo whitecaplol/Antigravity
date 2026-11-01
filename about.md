@@ -20,5 +20,5 @@ Adds physics (why not?)
 (or a roadmap)
 
 Currently, consists of some of the following:
-- Refinements in node selection necessary
+- Nine slices seem to fall apart sometimes.
 - Highly complex, layered scenes may not be perfect.

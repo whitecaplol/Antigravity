@@ -175,8 +175,8 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     currentMaps.insert_or_assign(node, data);
 }
 
-void AntigravityContext::step(float dt) {
-    if (!b2World_IsValid(worldId)) return;
+bool AntigravityContext::step(float dt) {
+    if (!b2World_IsValid(worldId)) return false;
 
     auto winSize = CCDirector::sharedDirector()->getWinSize();
     std::vector<CCNode*> nodes;
@@ -233,6 +233,8 @@ void AntigravityContext::step(float dt) {
         PriorData data{getAbsolutePosition(node), getAbsoluteRotation(node)};
         currentMaps.insert_or_assign(node, data);
     }
+
+    return true;
 }
 
 AntigravityContext::~AntigravityContext() {

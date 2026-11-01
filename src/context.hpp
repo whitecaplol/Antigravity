@@ -29,6 +29,6 @@ private:
 public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f);
 
-    void step(float dt);
+    bool step(float dt);
     ~AntigravityContext();
 };

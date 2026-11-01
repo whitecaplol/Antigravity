@@ -27,7 +27,11 @@ class $modify(CCDirector) {
         for (auto child : children) {
             if (!mod->getSettingValue<bool>("enable-everywhere") && is_any_of<PlayLayer*, LevelEditorLayer*>(child)) continue;
             if (activeLayers.contains(child)) {
-                activeLayers[child]->step(getDeltaTime());
+                auto success = activeLayers[child]->step(getDeltaTime());
+                if (!success) {
+                    delete activeLayers.at(child);
+                    activeLayers.erase(child);
+                }
             } else {
                 auto agContainer = AntigravityContext::create(
                     child, winSize,

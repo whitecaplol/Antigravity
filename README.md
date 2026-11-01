@@ -7,6 +7,7 @@
 
 Makes any UI have gravity (how ironic)
 - Doesn't matter what it is or what source it came from.
+- This differs from other physics-based mods that, to the best of my knowledge, only work on a subset of the game's UI.
 
 ## Features
 Adds physics (why not?)
@@ -21,5 +22,5 @@ Adds physics (why not?)
 (or a roadmap)
 
 Currently, consists of some of the following:
-- Refinements in node selection necessary
+- Nine slices seem to fall apart sometimes.
 - Highly complex, layered scenes may not be perfect.
