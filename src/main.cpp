@@ -17,6 +17,7 @@ void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
     if (!root) return;
     visited->append_range(root->getChildrenExt());
     for (auto child : root->getChildrenExt()) {
+        if (isAnyOf<LevelEditorLayer*>(child)) continue;
         collectAllDescendantsLike<CCLayer*>(child, visited);
     }
 }

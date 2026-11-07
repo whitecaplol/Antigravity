@@ -52,8 +52,13 @@ bool isCurrentlyWithinSceneGraph(CCNode* node) {
     return true;
 }
 
-void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize, std::unordered_set<CCNode*>* contextNodes, bool isEditor = false, bool isRoot = true) {
+void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize, std::unordered_set<CCNode*>* contextNodes, std::unordered_map<CCNode*, b2BodyId>* currentMap, bool isEditor = false, bool isRoot = true) {
     if (!node) return;
+
+    if (currentMap->contains(node)) {
+        visited->push_back(node);
+        return;
+    }
 
     if (!isRoot && (contextNodes->contains(node) || (node->getChildrenCount() == 1 && contextNodes->contains(node->getChildByIndex(0))))) return;
 
@@ -74,7 +79,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
             return;
         }
         for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize, contextNodes, isEditor, false);
+            collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false);
         }
         return;
     }
@@ -98,7 +103,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     for (auto child : node->getChildrenExt()) {
-        collectDescendants(child, visited, winSize, contextNodes, isEditor, false);
+        collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false);
     }
 }
 
@@ -248,7 +253,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
     });
 
     std::vector<CCNode*> nodes;
-    collectDescendants(root, &nodes, winSize, contextNodes, isEditor);
+    collectDescendants(root, &nodes, winSize, contextNodes, &maps, isEditor);
     std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
 
     std::erase_if(candidateMaps, [&lookup](const auto& pair) {
