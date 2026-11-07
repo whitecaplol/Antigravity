@@ -84,14 +84,23 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-    if (isAnyOf<CCMenuItemSpriteExtra*, CCTextInputNode*>(node)) {
+    if (isAnyOf<CCTextInputNode*>(node)) {
+        visited->push_back(node);
+        return;
+    }
+
+    if (isAnyOf<CCMenuItemSpriteExtra*>(node)) {
+        if (auto sprite = node->getChildByType<CCSprite*>()) {
+            if (!sprite->getOpacity()) return;
+        }
         visited->push_back(node);
         return;
     }
 
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
     auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
-        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*>(node);
+        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*,
+        MDTextArea*, LazySprite*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
@@ -123,7 +132,7 @@ float getAbsoluteRotation(CCNode* node) {
         rotation += node->getRotation();
         node = node->getParent();
     }
-    return clampf(rotation, -180.0f, 180.0f);
+    return remainder(rotation, 360);
 }
 
 void setAbsoluteRotation(CCNode* node, float angle) {
