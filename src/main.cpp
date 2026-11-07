@@ -1,43 +1,38 @@
 #include "context.hpp"
 
-void collectAllDescendantsLike(const char* type, CCNode* root, std::vector<CCNode*>* visited) {
+template <typename T>
+void collectAllDescendantsLike(CCNode* root, std::vector<CCNode*>* visited) {
     if (!root) return;
 
-    if (std::strcmp(type, getRuntimeTypeName(root)) == 0) {
+    if (isAnyOf<T>(root)) {
         visited->push_back(root);
     }
 
     for (auto child : root->getChildrenExt()) {
-        collectAllDescendantsLike(type, child, visited);
+        collectAllDescendantsLike<T>(child, visited);
     }
 }
 
-void collectChildrenForContexts(const char* type, CCNode* root, std::vector<CCNode*>* visited) {
+void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
     if (!root) return;
     visited->append_range(root->getChildrenExt());
     for (auto child : root->getChildrenExt()) {
-        collectAllDescendantsLike(type, child, visited);
+        collectAllDescendantsLike<CCLayer*>(child, visited);
     }
 }
 
 // Because CCDirectors do not support fields
 std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
-CCLayer* layerTypeDummy = nullptr;
 
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
     void drawScene() {
-        if (!layerTypeDummy) {
-            layerTypeDummy = CCLayer::create();
-            CC_SAFE_RETAIN(layerTypeDummy);
-        }
-
         auto mod = Mod::get();
         auto winSize = getWinSize();
         auto scene = getRunningScene();
 
         std::vector<CCNode*> contextNodes;
-        collectChildrenForContexts(getRuntimeTypeName(layerTypeDummy), scene, &contextNodes);
+        collectChildrenForContexts(scene, &contextNodes);
 
         std::unordered_set<CCNode*> current(contextNodes.begin(), contextNodes.end());
 

@@ -19,7 +19,7 @@ struct PriorContext {
 
 template <typename... Types>
 bool isAnyOf(CCNode* node) {
-    return (... || typeinfo_cast<Types>(node));
+    return (... || exact_cast<Types>(node));
 }
 
 template <typename T>

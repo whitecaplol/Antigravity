@@ -8,15 +8,15 @@
 	},
 	"id": "whitecaplol.antigravity",
 	"name": "Antigravity",
-	"version": "v0.4.4",
+	"version": "v0.4.5",
 	"developer": "whitecaplol",
-	"description": "Adds gravity to any arbitrary UI element",
+	"description": "Adds gravity to most UI elements",
 	"dependencies": {},
 	"settings": {
 		"enabled": {
 			"type": "bool",
 			"name": "Enable Antigravity",
-			"description": "Adds gravity to most UI elements",
+			"description": "Add gravity to most UI elements",
 			"default": true
 		},
 		"enable-in-editor": {

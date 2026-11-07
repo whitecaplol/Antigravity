@@ -79,22 +79,13 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-    auto onlyGetChildren = isAnyOf<CCLabelBMFont*>(node);
-
-    if (onlyGetChildren) {
-        for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize, contextNodes, isEditor, false);
-        }
-        return;
-    }
-
     if (isAnyOf<CCMenuItemSpriteExtra*, CCTextInputNode*>(node)) {
         visited->push_back(node);
         return;
     }
 
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
-    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*,
+    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*>(node);
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;

@@ -1,3 +1,6 @@
+# 0.4.5
+- Much more robust types.
+
 # 0.4.4
 - 2.2091 Support on Geode 6.0.0-alpha.1
 - Better isolation of contexts.
