@@ -8,7 +8,7 @@
 	},
 	"id": "whitecaplol.antigravity",
 	"name": "Antigravity",
-	"version": "v0.4.5",
+	"version": "v0.5.0",
 	"developer": "whitecaplol",
 	"description": "Adds gravity to most UI elements",
 	"dependencies": {},
@@ -49,6 +49,18 @@
 				"slider": true,
 				"slider-step": 0.1
 			}
+		},
+		"reset-antigravity": {
+			"type": "keybind",
+			"name": "Reset Antigravity",
+			"descriptions": "The keybind to reset antigravity",
+			"default": "Ctrl+Shift+R"
+		},
+		"pause-antigravity": {
+			"type": "keybind",
+			"name": "Pause (or resume) Antigravity",
+			"descriptions": "The keybind to pause (or resume) antigravity",
+			"default": "Ctrl+Shift+P"
 		}
 	}
 }

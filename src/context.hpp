@@ -6,6 +6,7 @@ constexpr float halfThickness = 0.5f;
 
 struct PriorData {
     CCPoint position;
+    CCSize size;
     float angle;
 };
 
@@ -34,9 +35,10 @@ bool isDescendantOfType(CCNode* node) {
 class AntigravityContext {
 private:
     std::unordered_map<CCNode*, PriorData> candidateMaps;
-    std::unordered_map<CCNode*, PriorData> currentMaps; // Just to see if something else decided to modify the UI in the meantime.
+    std::unordered_map<CCNode*, PriorData> currentMaps;
     std::unordered_map<CCNode*, b2BodyId> maps;
     std::unordered_map<CCNode*, PriorContext> priorContext;
+    std::unordered_map<CCNode*, PriorContext> initialContext;
     CCNode* root;
     CCDirector* currentDirector;
     b2WorldId worldId = b2_nullWorldId;

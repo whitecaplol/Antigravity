@@ -1,3 +1,7 @@
+# 0.5.0
+- More proper state resetting.
+- Ability to pause and reset current scene using keybinds. 
+
 # 0.4.5
 - Much more robust types.
 

@@ -20,5 +20,4 @@ Adds physics (why not?)
 (or a roadmap)
 
 Currently, consists of some of the following:
-- Runs almost anywhere. And I mean almost anywhere. Fine-grained disabling of Antigravity will come soon.
 - Rotations alternate randomly on some objects when transitioning to and from Antigravity's influence.
