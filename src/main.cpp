@@ -25,6 +25,7 @@ void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
 // Because CCDirectors do not support fields
 std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
 bool resetQueued = false;
+bool pokeQueued = false;
 bool pauseAntigravity = false;
 
 #include <Geode/modify/CCDirector.hpp>
@@ -55,7 +56,7 @@ class $modify(CCDirector) {
                 if (isAnyOf<PlayLayer*>(child)) continue;
                 if (!mod->getSettingValue<bool>("enable-in-editor") && isAnyOf<LevelEditorLayer*>(child)) continue;
                 if (activeLayers.contains(child)) {
-                    auto success = activeLayers[child]->step(getDeltaTime(), &current);
+                    auto success = activeLayers[child]->step(getDeltaTime(), &current, pokeQueued);
                     if (!success) {
                         delete activeLayers.at(child);
                         activeLayers.erase(child);
@@ -76,6 +77,7 @@ class $modify(CCDirector) {
             }
         }
 
+        pokeQueued = false;
         CCDirector::drawScene();
     }
 };
@@ -90,6 +92,12 @@ $on_game(Loaded) {
     listenForKeybindSettingPresses("pause-antigravity", [](Keybind const& keybind, bool down, bool repeat, double timestamp) {
         if (down && !repeat) {
             pauseAntigravity = !pauseAntigravity;
+        }
+    });
+
+    listenForKeybindSettingPresses("poke-antigravity", [](Keybind const& keybind, bool down, bool repeat, double timestamp) {
+        if (down && !repeat) {
+            pokeQueued = true;
         }
     });
 }

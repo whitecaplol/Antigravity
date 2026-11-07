@@ -61,6 +61,12 @@
 			"name": "Pause (or resume) Antigravity",
 			"descriptions": "The keybind to pause (or resume) antigravity",
 			"default": "Ctrl+Shift+P"
+		},
+		"poke-antigravity": {
+			"type": "keybind",
+			"name": "Cause the elements to bounce",
+			"descriptions": "The keybind to bounce elements controlled by antigravity",
+			"default": "Ctrl+Shift+J"
 		}
 	}
 }

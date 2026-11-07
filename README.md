@@ -17,9 +17,3 @@ Adds physics (why not?)
 
 ## Dependencies
 [`box2d`](https://box2d.org/) (For physics)
-
-## Limitations
-(or a roadmap)
-
-Currently, consists of some of the following:
-- Rotations alternate randomly on some objects when transitioning to and from Antigravity's influence.

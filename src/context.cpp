@@ -85,8 +85,12 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     if (isAnyOf<CCTextInputNode*>(node)) {
-        visited->push_back(node);
-        return;
+        if (auto textField = node->getChildByType<CCTextFieldTTF*>()) {
+            if (textField->isVisible()) {
+                visited->push_back(node);
+                return;
+            }
+        }
     }
 
     if (isAnyOf<CCMenuItemSpriteExtra*>(node)) {
@@ -187,22 +191,33 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     centralizeAnchorPoint(node);
 
     auto halfSize = node->getScaledContentSize() * 0.5f;
-    if (isAnyOf<CCFontSprite*>(node)) {
-        halfSize *= 0.2f;
-    }
-
     auto position = getAbsolutePosition(node);
 
     auto bodyDef = b2DefaultBodyDef();
     bodyDef.type = (isEditor && isDescendantOfType<GJGroundLayer*>(node)) ? b2_staticBody : b2_dynamicBody;
     bodyDef.position = {position.x, position.y};
-    bodyDef.rotation = b2MakeRot(CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node)));
+    float mathematicalAngle = -CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node));
+    bodyDef.rotation = b2MakeRot(mathematicalAngle);
 
     auto bodyId = b2CreateBody(worldId, &bodyDef);
 
     auto shapeDef = b2DefaultShapeDef();
     if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
         shapeDef.density = opacityNode->getOpacity() / 255.0f;
+    }
+
+    if (auto fontSprite = typeinfo_cast<CCFontSprite*>(node)) {
+        auto texture = fontSprite->getTexture();
+        // Thanks Devtools
+        auto cachedTextures = CCTextureCache::sharedTextureCache()->m_pTextures;
+        for (auto [key, obj] : CCDictionaryExt<std::string, CCTexture2D*>(cachedTextures)) {
+            if (obj != texture) continue;
+            auto fileName = std::filesystem::path(key).filename().string();
+            if (fileName.compare("goldFont-uhd.png") == 0 || fileName.compare("bigFont-uhd.png") == 0) {
+                halfSize *= 0.2f;
+            }
+            break;
+        }
     }
 
     if (isAnyOf<CircleButtonSprite*, LoadingCircleSprite*>(node)) {
@@ -232,7 +247,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     currentMaps.insert_or_assign(node, data);
 }
 
-bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNodes) {
+bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke) {
     if (!b2World_IsValid(worldId)) return false;
 
     auto winSize = CCDirector::sharedDirector()->getWinSize();
@@ -269,8 +284,16 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
         return !lookup.contains(pair.first);
     });
 
+    auto initialVelocity = (poke ? -b2World_GetGravity(worldId) : b2Vec2_zero);
+
     for (auto node : nodes) {
-        if (maps.contains(node)) continue; // TODO for future: Update boxes as needed.
+        if (maps.contains(node)) {
+            auto id = maps.at(node);
+            if (poke && b2Body_GetType(id) != b2_staticBody) {
+                b2Body_SetLinearVelocity(id, b2Body_GetLinearVelocity(id) + initialVelocity);
+            }
+            continue;
+        }
         if (!isEditor) {
             if (candidateMaps.contains(node)) {
                 auto prior = candidateMaps[node];
@@ -279,7 +302,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
                 auto sizeDiff = (node->getScaledContentSize() - prior.size);
 
                 if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0 || sizeDiff.width > 0 || sizeDiff.height > 0)) goto update_data; // Sorry
-                setUpPhysics(node, winSize, {0, 0}, 0); // TODO: add optional menu setting here
+                setUpPhysics(node, winSize, initialVelocity, 0);
                 candidateMaps.erase(node);
             } else {
                 update_data:
@@ -288,7 +311,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             }
         } else {
             if (!maps.contains(node)) {
-                setUpPhysics(node, winSize, {0, 0}, 0);
+                setUpPhysics(node, winSize, initialVelocity, 0);
             }
         }
     }
