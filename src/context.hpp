@@ -49,7 +49,7 @@ private:
 public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f);
 
-    bool step(float dt);
+    bool step(float dt, std::unordered_set<CCNode*>* contextNodes);
     void reset();
 
     ~AntigravityContext();

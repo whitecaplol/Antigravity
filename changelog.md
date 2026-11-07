@@ -1,3 +1,7 @@
+# 0.4.4
+- 2.2091 Support on Geode 6.0.0-alpha.1
+- Better isolation of contexts.
+
 # 0.4.3
 - First beta release
 - Much more friendly in the editor.

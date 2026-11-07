@@ -52,8 +52,10 @@ bool isCurrentlyWithinSceneGraph(CCNode* node) {
     return true;
 }
 
-void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize, bool isEditor = false) {
+void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize, std::unordered_set<CCNode*>* contextNodes, bool isEditor = false, bool isRoot = true) {
     if (!node) return;
+
+    if (!isRoot && (contextNodes->contains(node) || (node->getChildrenCount() == 1 && contextNodes->contains(node->getChildByIndex(0))))) return;
 
     if (isEditor) {
         if (isAnyOf<EditorUI*>(node)) return;
@@ -72,7 +74,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
             return;
         }
         for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize, isEditor);
+            collectDescendants(child, visited, winSize, contextNodes, isEditor, false);
         }
         return;
     }
@@ -81,12 +83,12 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
 
     if (onlyGetChildren) {
         for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize);
+            collectDescendants(child, visited, winSize, contextNodes, isEditor, false);
         }
         return;
     }
 
-    if (isAnyOf<CCMenuItemSpriteExtra*>(node)) {
+    if (isAnyOf<CCMenuItemSpriteExtra*, CCTextInputNode*>(node)) {
         visited->push_back(node);
         return;
     }
@@ -97,7 +99,6 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
-
     auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
 
     if ((isValid || shouldAlsoGetChildren) && isSmallEnough && isLargeEnough && isActuallyVisible(node) && (nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
@@ -106,7 +107,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     for (auto child : node->getChildrenExt()) {
-        collectDescendants(child, visited, winSize);
+        collectDescendants(child, visited, winSize, contextNodes, isEditor, false);
     }
 }
 
@@ -224,7 +225,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     currentMaps.insert_or_assign(node, data);
 }
 
-bool AntigravityContext::step(float dt) {
+bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNodes) {
     if (!b2World_IsValid(worldId)) return false;
 
     auto winSize = CCDirector::sharedDirector()->getWinSize();
@@ -253,7 +254,7 @@ bool AntigravityContext::step(float dt) {
     });
 
     std::vector<CCNode*> nodes;
-    collectDescendants(root, &nodes, winSize, isEditor);
+    collectDescendants(root, &nodes, winSize, contextNodes, isEditor);
     std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
 
     std::erase_if(candidateMaps, [&lookup](const auto& pair) {
