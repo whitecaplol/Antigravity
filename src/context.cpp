@@ -5,6 +5,16 @@ CCPoint getAbsolutePosition(CCNode* node) {
     return node->convertToWorldSpace(node->getContentSize() * 0.5);
 }
 
+CCSize getTruerSize(CCNode* node) {
+    if (!node) return CCSizeZero;
+    auto result = node->getContentSize();
+    while (node != nullptr) {
+        result.setSize(result.width * node->getScaleX(), result.height * node->getScaleY());
+        node = node->getParent();
+    }
+    return result;
+}
+
 bool nodeIsFullyInsideViewport(CCNode* node, CCSize& winSize) {
     if (!node) return false;
 
@@ -105,7 +115,9 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*,
         MDTextArea*, LazySprite*>(node);
-    auto width = node->getScaledContentWidth(), height = node->getScaledContentHeight();
+    auto size = getTruerSize(node);
+    auto width = size.width;
+    auto height = size.height;
     auto isSmallEnough = height < winSize.height && width < winSize.width;
     auto isLargeEnough = width > 0 && height > 0;
     auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
@@ -190,7 +202,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
 
     centralizeAnchorPoint(node);
 
-    auto halfSize = node->getScaledContentSize() * 0.5f;
+    auto halfSize = getTruerSize(node) * 0.5f;
     auto position = getAbsolutePosition(node);
 
     auto bodyDef = b2DefaultBodyDef();
@@ -243,7 +255,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
 
     maps.insert_or_assign(node, bodyId);
 
-    PriorData data{getAbsolutePosition(node), node->getScaledContentSize(), getAbsoluteRotation(node)};
+    PriorData data{getAbsolutePosition(node), getTruerSize(node), getAbsoluteRotation(node)};
     currentMaps.insert_or_assign(node, data);
 }
 
@@ -256,11 +268,12 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
         CCNode* node = pair.first;
         if (b2Body_IsValid(pair.second) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
             PriorData expectedData = currentMaps[node];
-            auto sizeDiff = (node->getScaledContentSize() - expectedData.size);
-            if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0 || sizeDiff.width > 0 || sizeDiff.height > 0) return false;
+            auto sizeDiff = (getTruerSize(node) - expectedData.size);
+            if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0 && abs(sizeDiff.width) <= 0 && abs(sizeDiff.height) <= 0) return false;
         }
         if (priorContext.contains(node)) {
-            PriorContext ctx = priorContext.at(node);
+            auto isGroundLayerSprite = isDescendantOfType<GJGroundLayer*>(node);
+            PriorContext ctx = isGroundLayerSprite ? initialContext.at(node) : priorContext.at(node);
             if (ctx.ref.valid() && !(isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node))) {
                 node->setAnchorPoint(ctx.anchorPoint);
                 node->setPosition(ctx.position);
@@ -299,14 +312,14 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
                 auto prior = candidateMaps[node];
                 auto velocity = (getAbsolutePosition(node) - prior.position) / dt;
                 auto angularVelocity = -(getAbsoluteRotation(node) - prior.angle) / dt;
-                auto sizeDiff = (node->getScaledContentSize() - prior.size);
+                auto sizeDiff = (getTruerSize(node) - prior.size);
 
-                if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0 || sizeDiff.width > 0 || sizeDiff.height > 0)) goto update_data; // Sorry
+                if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0 || abs(sizeDiff.width) > 0 || abs(sizeDiff.height) > 0)) goto update_data; // Sorry
                 setUpPhysics(node, winSize, initialVelocity, 0);
                 candidateMaps.erase(node);
             } else {
                 update_data:
-                PriorData data{getAbsolutePosition(node), node->getScaledContentSize(), getAbsoluteRotation(node)};
+                PriorData data{getAbsolutePosition(node), getTruerSize(node), getAbsoluteRotation(node)};
                 candidateMaps.insert_or_assign(node, data);
             }
         } else {
@@ -331,7 +344,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
 
     for (auto node : nodes) {
         if (!maps.contains(node)) continue;
-        PriorData data{getAbsolutePosition(node), node->getScaledContentSize(), getAbsoluteRotation(node)};
+        PriorData data{getAbsolutePosition(node), getTruerSize(node), getAbsoluteRotation(node)};
         currentMaps.insert_or_assign(node, data);
     }
 
