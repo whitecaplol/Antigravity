@@ -1,3 +1,7 @@
+# 0.5.1
+- Quite a few bug fixes
+- Correcting Sliders
+
 # 0.5.0
 - More proper state resetting.
 - Ability to pause and reset current scene using keybinds.

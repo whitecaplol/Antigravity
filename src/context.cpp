@@ -9,7 +9,7 @@ CCSize getTruerSize(CCNode* node) {
     if (!node) return CCSizeZero;
     auto result = node->getContentSize();
     while (node != nullptr) {
-        result.setSize(result.width * node->getScaleX(), result.height * node->getScaleY());
+        result.setSize(abs(result.width * node->getScaleX()), abs(result.height * node->getScaleY()));
         node = node->getParent();
     }
     return result;
@@ -99,8 +99,8 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         return;
     }
 
-    if (isAnyOf<CCTextInputNode*>(node)) {
-        if (isActuallyVisible(node)) {
+    if (isAnyOf<CCTextInputNode*, Slider*>(node)) {
+        if (isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
             return;
         }
@@ -110,16 +110,16 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         if (auto sprite = node->getChildByType<CCSprite*>()) {
             if (!sprite->getOpacity()) return;
         }
-        if (isActuallyVisible(node)) {
+        if (isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
         }
         return;
     }
 
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
-    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
+    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*, InfoAlertButton*,
-        MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*>(node);
+        MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node);
     auto size = getTruerSize(node);
     auto width = size.width;
     auto height = size.height;
@@ -190,8 +190,21 @@ AntigravityContext* AntigravityContext::create(CCNode* root, CCSize& winSize, fl
     return object;
 }
 
+void updateSlider(Slider* slider) {
+    auto size = slider->m_groove->getScaledContentSize();
+    slider->setScaledContentSize(size);
+    slider->setAnchorPoint(ccp(0.5, 0.5));
+    slider->ignoreAnchorPointForPosition(false);
+    slider->m_groove->setPosition(size * 0.5f);
+    slider->m_touchLogic->setPosition(size * 0.5f);
+}
+
 void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity, float angularVelocity) {
     if (!node) return;
+
+    if (auto slider = typeinfo_cast<Slider*>(node)) {
+        updateSlider(slider);
+    }
 
     priorContext.insert_or_assign(node, PriorContext{
         WeakRef(node),
