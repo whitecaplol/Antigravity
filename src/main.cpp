@@ -14,7 +14,7 @@ void collectAllDescendantsLike(CCNode* root, std::vector<CCNode*>* visited) {
 }
 
 void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
-    if (!root) return;
+    if (!root || root->getChildByType<LoadingLayer*>()) return;
     visited->append_range(root->getChildrenExt());
     for (auto child : root->getChildrenExt()) {
         if (isAnyOf<LevelEditorLayer*>(child)) continue;
@@ -51,22 +51,25 @@ class $modify(CCDirector) {
             return true;
         });
 
+        auto currentGravityX = mod->getSettingValue<float>("gravity-x");
+        auto currentGravityY = mod->getSettingValue<float>("gravity-y");
+        auto glueFonts = mod->getSettingValue<bool>("glue-fonts");
+
         if (mod->getSettingValue<bool>("enabled") && !resetQueued) {
             for (auto child : contextNodes) {
                 if (isAnyOf<PlayLayer*>(child)) continue;
                 if (!mod->getSettingValue<bool>("enable-in-editor") && isAnyOf<LevelEditorLayer*>(child)) continue;
                 if (activeLayers.contains(child)) {
-                    auto success = activeLayers[child]->step(getDeltaTime(), &current, pokeQueued);
+                    auto context = activeLayers[child];
+                    context->setGravity(currentGravityX, currentGravityY);
+                    context->setGlueFonts(glueFonts);
+                    auto success = context->step(getDeltaTime(), &current, pokeQueued);
                     if (!success) {
                         delete activeLayers.at(child);
                         activeLayers.erase(child);
                     }
                 } else {
-                    auto agContainer = AntigravityContext::create(
-                        child, winSize,
-                        mod->getSettingValue<float>("gravity-x"),
-                        mod->getSettingValue<float>("gravity-y")
-                    );
+                    auto agContainer = AntigravityContext::create(child, winSize, currentGravityX, currentGravityY, glueFonts);
                     activeLayers.insert_or_assign(child, agContainer);
                 }
             }

@@ -67,7 +67,16 @@ bool isCurrentlyWithinSceneGraph(CCNode* node) {
     return true;
 }
 
-void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& winSize, std::unordered_set<CCNode*>* contextNodes, std::unordered_map<CCNode*, b2BodyId>* currentMap, bool isEditor = false, bool isRoot = true) {
+void collectDescendants(
+    CCNode* node,
+    std::vector<CCNode*>* visited,
+    CCSize& winSize,
+    std::unordered_set<CCNode*>* contextNodes,
+    std::unordered_map<CCNode*, b2BodyId>* currentMap,
+    bool isEditor = false,
+    bool isRoot = true,
+    bool glueFonts = true
+) {
     if (!node) return;
 
     if (currentMap->contains(node)) {
@@ -89,12 +98,12 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
             }
             return;
         }
-        if (isAnyOf<GameObject*>(node)) {
+        if (typeinfo_cast<GameObject*>(node) && isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
             return;
         }
         for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false);
+            collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false, glueFonts);
         }
         return;
     }
@@ -117,9 +126,10 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
-    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
-        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*,
-        InfoAlertButton*, MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node);
+    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
+        CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, ScrollableContentLayer*,
+        InfoAlertButton*, MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node) ||
+        (typeinfo_cast<CCLayerColor*>(node) != nullptr) || (glueFonts ? isAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
     auto size = getTruerSize(node);
     auto width = size.width;
     auto height = size.height;
@@ -133,7 +143,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     for (auto child : node->getChildrenExt()) {
-        collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false);
+        collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false, glueFonts);
     }
 }
 
@@ -177,17 +187,26 @@ void AntigravityContext::setUpWorldBorder(CCSize& winSize) {
     b2CreateChain(borderBodyId, &chainDef);
 };
 
-AntigravityContext* AntigravityContext::create(CCNode* root, CCSize& winSize, float gravityX, float gravityY) {
+AntigravityContext* AntigravityContext::create(CCNode* root, CCSize& winSize, float gravityX, float gravityY, bool glueFonts) {
     auto worldDef = b2DefaultWorldDef();
     worldDef.gravity = {gravityX, gravityY};
     auto worldId = b2CreateWorld(&worldDef);
 
     if (!b2World_IsValid(worldId)) return nullptr;
 
-    AntigravityContext* object = new AntigravityContext(root, worldId);
+    AntigravityContext* object = new AntigravityContext(root, worldId, glueFonts);
     object->setUpWorldBorder(winSize);
 
     return object;
+}
+
+void AntigravityContext::setGravity(float gravityX, float gravityY) {
+    if (!b2World_IsValid(worldId)) return;
+    b2World_SetGravity(worldId, {gravityX, gravityY});
+}
+
+void AntigravityContext::setGlueFonts(bool set) {
+    glueFonts = set;
 }
 
 void updateSlider(Slider* slider) {
@@ -329,7 +348,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
     });
 
     std::vector<CCNode*> nodes;
-    collectDescendants(root, &nodes, winSize, contextNodes, &maps, isEditor);
+    collectDescendants(root, &nodes, winSize, contextNodes, &maps, isEditor, glueFonts);
     std::unordered_set<CCNode*> lookup(nodes.begin(), nodes.end());
 
     std::erase_if(candidateMaps, [&lookup](const auto& pair) {

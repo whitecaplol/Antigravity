@@ -43,15 +43,18 @@ private:
     CCDirector* currentDirector;
     b2WorldId worldId = b2_nullWorldId;
     bool isEditor;
+    bool glueFonts;
 
-    AntigravityContext(CCNode* root, b2WorldId worldId) : root(root), worldId(worldId), isEditor(isAnyOf<LevelEditorLayer*>(root)) {}
+    AntigravityContext(CCNode* root, b2WorldId worldId, bool glueFonts) : root(root), worldId(worldId), isEditor(isAnyOf<LevelEditorLayer*>(root)), glueFonts(glueFonts) {}
 
     void setUpWorldBorder(CCSize& winSize);
     void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0, 0}, float angularVelocity = 0.0f);
 public:
-    static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f);
+    static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f, bool glueFonts = true);
 
     bool step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke);
+    void setGravity(float gravityX, float gravityY);
+    void setGlueFonts(bool set);
     void reset();
 
     ~AntigravityContext();

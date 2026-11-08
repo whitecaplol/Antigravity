@@ -26,6 +26,13 @@
 			"description": "Adds gravity to editor",
 			"default": false
 		},
+		"glue-fonts": {
+			"enable-if": "enabled",
+			"type": "bool",
+			"name": "Glue fonts",
+			"description": "Keep characters coherent",
+			"default": true
+		},
 		"gravity-x": {
 			"type": "float",
 			"name": "Gravity (x)",
