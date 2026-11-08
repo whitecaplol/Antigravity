@@ -213,6 +213,8 @@ void AntigravityContext::setGlueFonts(bool set) {
 
 void updateSlider(Slider* slider) {
     auto size = slider->m_groove->getScaledContentSize();
+    auto theta = -CC_DEGREES_TO_RADIANS(slider->m_groove->getRotation());
+    size.setSize(size.width * cos(theta) - size.height * sin(theta), size.width * sin(theta) + size.height * cos(theta));
     slider->setScaledContentSize(size);
     slider->setAnchorPoint(ccp(0.5, 0.5));
     slider->ignoreAnchorPointForPosition(false);
