@@ -74,8 +74,8 @@ void collectDescendants(
     std::unordered_set<CCNode*>* contextNodes,
     std::unordered_map<CCNode*, b2BodyId>* currentMap,
     bool isEditor = false,
-    bool isRoot = true,
-    bool glueFonts = true
+    bool glueFonts = true,
+    bool isRoot = true
 ) {
     if (!node) return;
 
@@ -103,7 +103,7 @@ void collectDescendants(
             return;
         }
         for (auto child : node->getChildrenExt()) {
-            collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false, glueFonts);
+            collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, glueFonts, false);
         }
         return;
     }
@@ -143,7 +143,7 @@ void collectDescendants(
     }
 
     for (auto child : node->getChildrenExt()) {
-        collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, false, glueFonts);
+        collectDescendants(child, visited, winSize, contextNodes, currentMap, isEditor, glueFonts, false);
     }
 }
 
@@ -236,7 +236,7 @@ void updateTextInputNode(CCTextInputNode* textInput) {
 }
 
 CCSize getCCFontSpriteTrueSize(CCFontSprite* fontSprite) {
-    auto size = fontSprite->getContentSize();
+    auto size = getTruerSize(fontSprite);
     auto texture = fontSprite->getTexture();
     // Thanks Devtools
     auto cachedTextures = CCTextureCache::sharedTextureCache()->m_pTextures;
