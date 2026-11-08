@@ -118,8 +118,8 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
 
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
     auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
-        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*, InfoAlertButton*,
-        MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node);
+        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*,
+        InfoAlertButton*, MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node);
     auto size = getTruerSize(node);
     auto width = size.width;
     auto height = size.height;
@@ -199,11 +199,46 @@ void updateSlider(Slider* slider) {
     slider->m_touchLogic->setPosition(size * 0.5f);
 }
 
+void updateTextInputNode(CCTextInputNode* textInput) {
+    auto size = textInput->getScaledContentSize();
+    textInput->ignoreAnchorPointForPosition(false);
+    if (textInput->m_textArea) {
+        textInput->m_textArea->setPosition(size * 0.5f);
+    }
+    if (textInput->m_textLabel) {
+        textInput->m_textLabel->setPosition(size * 0.5f);
+    }
+    if (textInput->m_textField) {
+        textInput->m_textField->setPosition(size * 0.5f);
+    }
+    if (textInput->m_cursor) {
+        textInput->m_cursor->setPosition(size * 0.5f);
+    }
+}
+
+CCSize getCCFontSpriteTrueSize(CCFontSprite* fontSprite) {
+    auto size = fontSprite->getContentSize();
+    auto texture = fontSprite->getTexture();
+    // Thanks Devtools
+    auto cachedTextures = CCTextureCache::sharedTextureCache()->m_pTextures;
+    for (auto [key, obj] : CCDictionaryExt<std::string, CCTexture2D*>(cachedTextures)) {
+        if (obj != texture) continue;
+        auto fileName = std::filesystem::path(key).filename().string();
+        if (fileName.contains("goldFont") || fileName.compare("bigFont")) {
+            size.setSize(size.width * 0.35f, size.height * 0.5f);
+        }
+        break;
+    }
+    return size;
+}
+
 void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity, float angularVelocity) {
     if (!node) return;
 
-    if (auto slider = typeinfo_cast<Slider*>(node)) {
+    if (auto slider = exact_cast<Slider*>(node)) {
         updateSlider(slider);
+    } else if (auto textInput = exact_cast<CCTextInputNode*>(node)) {
+        updateTextInputNode(textInput);
     }
 
     priorContext.insert_or_assign(node, PriorContext{
@@ -220,7 +255,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
 
     centralizeAnchorPoint(node);
 
-    auto halfSize = getTruerSize(node) * 0.5f;
+    auto halfSize = (isAnyOf<CCFontSprite*>(node) ? getCCFontSpriteTrueSize(exact_cast<CCFontSprite*>(node)) : getTruerSize(node)) * 0.5f;
     auto position = getAbsolutePosition(node);
 
     auto bodyDef = b2DefaultBodyDef();
@@ -234,20 +269,6 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     auto shapeDef = b2DefaultShapeDef();
     if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
         shapeDef.density = opacityNode->getOpacity() / 255.0f;
-    }
-
-    if (auto fontSprite = typeinfo_cast<CCFontSprite*>(node)) {
-        auto texture = fontSprite->getTexture();
-        // Thanks Devtools
-        auto cachedTextures = CCTextureCache::sharedTextureCache()->m_pTextures;
-        for (auto [key, obj] : CCDictionaryExt<std::string, CCTexture2D*>(cachedTextures)) {
-            if (obj != texture) continue;
-            auto fileName = std::filesystem::path(key).filename().string();
-            if (fileName.contains("goldFont") || fileName.compare("bigFont")) {
-                halfSize *= 0.2f;
-            }
-            break;
-        }
     }
 
     if (isAnyOf<CircleButtonSprite*, LoadingCircleSprite*>(node)) {

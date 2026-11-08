@@ -1,6 +1,6 @@
 # 0.5.1
 - Quite a few bug fixes
-- Correcting Sliders
+- Correcting sliders and fonts
 
 # 0.5.0
 - More proper state resetting.
