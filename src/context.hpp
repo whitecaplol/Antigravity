@@ -23,6 +23,11 @@ bool isAnyOf(CCNode* node) {
     return (... || exact_cast<Types>(node));
 }
 
+template <typename... Types>
+bool isRelaxedAnyOf(CCNode* node) {
+    return (... || typeinfo_cast<Types>(node));
+}
+
 template <typename T>
 bool isDescendantOfType(CCNode* node) {
     while (node != nullptr) {

@@ -108,7 +108,9 @@ void collectDescendants(
         return;
     }
 
-    if (isAnyOf<CCTextInputNode*, Slider*>(node)) {
+    if (isAnyOf<GJGroundLayer*>(node)) return;
+
+    if (isAnyOf<CCTextInputNode*, Slider*>(node) || isRelaxedAnyOf<CCParticleSystem*>(node)) {
         if (isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
             return;
@@ -129,7 +131,7 @@ void collectDescendants(
     auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
         CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, ScrollableContentLayer*,
         InfoAlertButton*, MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node) ||
-        (typeinfo_cast<CCLayerColor*>(node) != nullptr) || (glueFonts ? isAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
+        isRelaxedAnyOf<CCLayerColor*>(node) || (glueFonts ? isRelaxedAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
     auto size = getTruerSize(node);
     auto width = size.width;
     auto height = size.height;
@@ -275,6 +277,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     centralizeAnchorPoint(node);
 
     auto halfSize = (isAnyOf<CCFontSprite*>(node) ? getCCFontSpriteTrueSize(exact_cast<CCFontSprite*>(node)) : getTruerSize(node)) * 0.5f;
+    halfSize.setSize(fmax(halfSize.width, halfThickness), fmax(halfSize.height, halfThickness));
     auto position = getAbsolutePosition(node);
 
     auto bodyDef = b2DefaultBodyDef();
