@@ -48,6 +48,11 @@ bool nodeIntersectsViewport(CCNode* node, CCSize& winSize) {
 bool isActuallyVisible(CCNode* node) {
     while (node != nullptr) {
         if (!node->isVisible()) return false;
+        if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
+            if (opacityNode->getOpacity() == 0) {
+                return false;
+            }
+        }
         node = node->getParent();
     }
     return true;
@@ -107,13 +112,15 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
         if (auto sprite = node->getChildByType<CCSprite*>()) {
             if (!sprite->getOpacity()) return;
         }
-        visited->push_back(node);
+        if (isActuallyVisible(node)) {
+            visited->push_back(node);
+        }
         return;
     }
 
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
     auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
-        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*,
+        CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*, InfoAlertButton*,
         MDTextArea*, LazySprite*>(node);
     auto size = getTruerSize(node);
     auto width = size.width;
