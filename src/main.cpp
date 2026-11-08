@@ -2,7 +2,7 @@
 
 template <typename T>
 void collectAllDescendantsLike(CCNode* root, std::vector<CCNode*>* visited) {
-    if (!root || isAnyOf<GJListLayer*, PlayLayer*>(root)) return;
+    if (!root || isAnyOf<GJListLayer*, PlayLayer*, LevelCell*>(root)) return;
 
     if (isAnyOf<T>(root)) {
         visited->push_back(root);

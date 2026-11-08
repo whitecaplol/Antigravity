@@ -100,11 +100,9 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     }
 
     if (isAnyOf<CCTextInputNode*>(node)) {
-        if (auto textField = node->getChildByType<CCTextFieldTTF*>()) {
-            if (textField->isVisible()) {
-                visited->push_back(node);
-                return;
-            }
+        if (isActuallyVisible(node)) {
+            visited->push_back(node);
+            return;
         }
     }
 
@@ -121,7 +119,7 @@ void collectDescendants(CCNode* node, std::vector<CCNode*>* visited, CCSize& win
     auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
     auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, Slider*, CCFontSprite*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
         CCLayerColor*, CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, GJListLayer*, InfoAlertButton*,
-        MDTextArea*, LazySprite*>(node);
+        MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*>(node);
     auto size = getTruerSize(node);
     auto width = size.width;
     auto height = size.height;
@@ -232,7 +230,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
         for (auto [key, obj] : CCDictionaryExt<std::string, CCTexture2D*>(cachedTextures)) {
             if (obj != texture) continue;
             auto fileName = std::filesystem::path(key).filename().string();
-            if (fileName.compare("goldFont-uhd.png") == 0 || fileName.compare("bigFont-uhd.png") == 0) {
+            if (fileName.contains("goldFont") || fileName.compare("bigFont")) {
                 halfSize *= 0.2f;
             }
             break;
