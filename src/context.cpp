@@ -171,7 +171,7 @@ void AntigravityContext::setUpWorldBorder(CCSize& winSize) {
     b2Vec2 vertices[4] = {{0, 0}, {0, winSize.height}, {winSize.width, winSize.height}, {winSize.width, 0}};
     auto chainDef = b2DefaultChainDef();
     chainDef.points = vertices;
-    chainDef.count = 4;
+    chainDef.pointCount = 4;
     chainDef.isLoop = true;
 
     b2CreateChain(borderBodyId, &chainDef);
