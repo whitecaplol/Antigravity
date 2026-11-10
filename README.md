@@ -3,7 +3,7 @@
 
 <img src="logo.png" width="150" alt="Antigravity logo" />
 
-*Note: this mod is in beta. Things have been somewhat tested, but there may still be issues.*
+*Note: this mod is in pre-release. Things have been tested, but there may still be rare issues.*
 
 Makes any UI have gravity (how ironic)
 - Doesn't matter what it is or what source it came from.

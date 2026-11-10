@@ -127,19 +127,25 @@ void collectDescendants(
         return;
     }
 
-    auto isValid = isRelaxedAnyOf<CCNodeRGBA*, CCScrollLayerExt*, TextInput*, Scrollbar*,
-        ListBorders*, ScrollableContentLayer*, MDTextArea*, Label*, CCLayerColor*>(node) ||
-        (glueFonts ? isRelaxedAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
-    auto size = getTruerSize(node);
-    auto width = size.width;
-    auto height = size.height;
-    auto isSmallEnough = height < winSize.height && width < winSize.width;
-    auto isLargeEnough = width > 0 && height > 0;
-    auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
+    if (isAnyOf<CCSpriteBatchNode*>(node)) return;
 
-    if (isValid && isSmallEnough && isLargeEnough && isActuallyVisible(node) && (nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
-        visited->push_back(node);
-        return;
+    auto isValid = isRelaxedAnyOf<CCNodeRGBA*, CCScrollLayerExt*, TextInput*, Scrollbar*, Label*,
+        ListBorders*, ScrollableContentLayer*, MDTextArea*, CCLayerColor*>(node) ||
+        (glueFonts ? isRelaxedAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
+
+    if (isValid) {
+        auto size = getTruerSize(node);
+        auto width = size.width;
+        auto height = size.height;
+        auto isSmallEnough = height < winSize.height && width < winSize.width;
+        auto isLargeEnough = width > 0 && height > 0;
+        auto dontCareAboutViewport = isDescendantOfRelaxedType<ScrollableContentLayer*>(node);
+        auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
+
+        if (isSmallEnough && isLargeEnough && isActuallyVisible(node) && (dontCareAboutViewport || nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
+            visited->push_back(node);
+            return;
+        }
     }
 
     for (auto child : node->getChildrenExt()) {
@@ -257,7 +263,7 @@ CCSize getCCFontSpriteTrueSize(CCFontSprite* fontSprite) {
     return size;
 }
 
-void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity, float angularVelocity) {
+void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity, float angularVelocity, float halfThickness) {
     if (!node) return;
 
     if (auto slider = exact_cast<Slider*>(node)) {
@@ -298,9 +304,15 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
         shapeDef.density = opacityNode->getOpacity() / 255.0f;
     }
 
+    auto doSolidBox = isAnyOf<CCMenuItemSpriteExtra*, CCTextInputNode*, Slider*>(node) ||
+        isRelaxedAnyOf<GameObject*, Scrollbar*, TextInput*, Label*, CCFontSprite*>(node);
+
     if (isAnyOf<CircleButtonSprite*>(node)) {
         b2Circle circle = {{0.0f, 0.0f}, 0.5f * (halfSize.width + halfSize.height)};
         b2CreateCircleShape(bodyId, &shapeDef, &circle);
+    } else if (doSolidBox) {
+        auto box = b2MakeBox(halfSize.width, halfSize.height);
+        b2CreatePolygonShape(bodyId, &shapeDef, &box);
     } else {
         auto leftBox = b2MakeOffsetBox(halfThickness, halfSize.height, {-(halfSize.width-halfThickness), 0}, b2Rot_identity);
         b2CreatePolygonShape(bodyId, &shapeDef, &leftBox);
@@ -418,24 +430,28 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
 }
 
 void AntigravityContext::reset() {
-    for (const auto& [node, bodyId] : maps) {
-        if (initialContext.contains(node)) {
-            PriorContext ctx = initialContext.at(node);
-            if (!ctx.ref.valid()) continue;
-            node->setAnchorPoint(ctx.anchorPoint);
-            node->setPosition(ctx.position);
-            node->setRotation(ctx.rotation);
-            node->ignoreAnchorPointForPosition(ctx.ignoreAnchorPointForPosition);
+    for (const auto& [node, ctx] : initialContext) {
+        if (maps.contains(node)) {
+            auto bodyId = maps.at(node);
+            if (b2Body_IsValid(bodyId)) {
+                b2DestroyBody(bodyId);
+            }
         }
-        if (b2Body_IsValid(bodyId)) {
-            b2DestroyBody(bodyId);
-        }
-        currentMaps.erase(node);
-        priorContext.erase(node);
+
+        if (!ctx.ref.valid()) continue;
+        node->setAnchorPoint(ctx.anchorPoint);
+        node->setPosition(ctx.position);
+        node->setRotation(ctx.rotation);
+        node->ignoreAnchorPointForPosition(ctx.ignoreAnchorPointForPosition);
     }
+
+    currentMaps.clear();
+    priorContext.clear();
+    initialContext.clear();
 }
 
 AntigravityContext::~AntigravityContext() {
+    reset();
     if (b2World_IsValid(worldId)) b2DestroyWorld(worldId);
     worldId = b2_nullWorldId;
 }

@@ -1,15 +1,14 @@
 #include "context.hpp"
 
-template <typename T>
-void collectAllDescendantsLike(CCNode* root, std::vector<CCNode*>* visited) {
+void collectRemainingDescendants(CCNode* root, std::vector<CCNode*>* visited) {
     if (!root || isAnyOf<GJListLayer*, PlayLayer*, LevelCell*>(root)) return;
 
-    if (isAnyOf<T>(root)) {
+    if (isAnyOf<CCLayer*>(root) && (!isRelaxedAnyOf<CCLayer*>(root->getParent()) || root->getParent()->getChildrenCount() == 1)) {
         visited->push_back(root);
     }
 
     for (auto child : root->getChildrenExt()) {
-        collectAllDescendantsLike<T>(child, visited);
+        collectRemainingDescendants(child, visited);
     }
 }
 
@@ -18,7 +17,7 @@ void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
     visited->append_range(root->getChildrenExt());
     for (auto child : root->getChildrenExt()) {
         if (isAnyOf<LevelEditorLayer*>(child)) continue;
-        collectAllDescendantsLike<CCLayer*>(child, visited);
+        collectRemainingDescendants(child, visited);
     }
 }
 
@@ -36,9 +35,14 @@ class $modify(CCDirector) {
             return;
         }
 
+        auto scene = getRunningScene();
+        if (isRelaxedAnyOf<CCTransitionScene*>(scene)) {
+            CCDirector::drawScene();
+            return;
+        }
+
         auto mod = Mod::get();
         auto winSize = getWinSize();
-        auto scene = getRunningScene();
 
         std::vector<CCNode*> contextNodes;
         collectChildrenForContexts(scene, &contextNodes);

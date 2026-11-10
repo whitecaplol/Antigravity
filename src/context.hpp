@@ -2,8 +2,6 @@
 
 using namespace geode::prelude;
 
-constexpr float halfThickness = 1.0f;
-
 struct PriorData {
     CCPoint position;
     CCSize size;
@@ -37,6 +35,15 @@ bool isDescendantOfType(CCNode* node) {
     return false;
 }
 
+template <typename T>
+bool isDescendantOfRelaxedType(CCNode* node) {
+    while (node != nullptr) {
+        if (isRelaxedAnyOf<T>(node)) return true;
+        node = node->getParent();
+    }
+    return false;
+}
+
 class AntigravityContext {
 private:
     std::unordered_map<CCNode*, PriorData> candidateMaps;
@@ -54,7 +61,7 @@ private:
     AntigravityContext(CCNode* root, b2WorldId worldId, bool glueFonts) : root(root), worldId(worldId), isEditor(isAnyOf<LevelEditorLayer*>(root)), glueFonts(glueFonts) {}
 
     void setUpWorldBorder(CCSize& winSize);
-    void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0, 0}, float angularVelocity = 0.0f);
+    void setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity = {0.0f, 0.0f}, float angularVelocity = 0.0f, float halfThickness = 0.5f);
 public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f, bool glueFonts = true);
 
