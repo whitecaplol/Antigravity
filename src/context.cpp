@@ -298,7 +298,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
         shapeDef.density = opacityNode->getOpacity() / 255.0f;
     }
 
-    if (isAnyOf<CircleButtonSprite*, LoadingCircleSprite*>(node)) {
+    if (isAnyOf<CircleButtonSprite*>(node)) {
         b2Circle circle = {{0.0f, 0.0f}, 0.5f * (halfSize.width + halfSize.height)};
         b2CreateCircleShape(bodyId, &shapeDef, &circle);
     } else {
