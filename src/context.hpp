@@ -2,7 +2,7 @@
 
 using namespace geode::prelude;
 
-constexpr float halfThickness = 0.5f;
+constexpr float halfThickness = 1.0f;
 
 struct PriorData {
     CCPoint position;
@@ -47,6 +47,7 @@ private:
     CCNode* root;
     CCDirector* currentDirector;
     b2WorldId worldId = b2_nullWorldId;
+    b2SurfaceMaterial material = b2DefaultSurfaceMaterial();
     bool isEditor;
     bool glueFonts;
 

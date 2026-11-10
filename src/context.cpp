@@ -18,10 +18,10 @@ CCSize getTruerSize(CCNode* node) {
 bool nodeIsFullyInsideViewport(CCNode* node, CCSize& winSize) {
     if (!node) return false;
 
-    auto c1 = node->convertToWorldSpace(ccp(0, 0));
-    auto c2 = node->convertToWorldSpace(ccp(node->getContentWidth(), 0));
+    auto c1 = node->convertToWorldSpace({0.0f, 0.0f});
+    auto c2 = node->convertToWorldSpace({node->getContentWidth(), 0.0f});
     auto c3 = node->convertToWorldSpace(node->getContentSize());
-    auto c4 = node->convertToWorldSpace(ccp(0, node->getContentHeight()));
+    auto c4 = node->convertToWorldSpace({0.0f, node->getContentHeight()});
 
     auto left = fmin(fmin(c1.x, c2.x), fmin(c3.x, c4.x));
     auto right = fmax(fmax(c1.x, c2.x), fmax(c3.x, c4.x));
@@ -33,10 +33,10 @@ bool nodeIsFullyInsideViewport(CCNode* node, CCSize& winSize) {
 bool nodeIntersectsViewport(CCNode* node, CCSize& winSize) {
     if (!node) return false;
 
-    auto c1 = node->convertToWorldSpace(ccp(0, 0));
-    auto c2 = node->convertToWorldSpace(ccp(node->getContentWidth(), 0));
+    auto c1 = node->convertToWorldSpace({0.0f, 0.0f});
+    auto c2 = node->convertToWorldSpace({node->getContentWidth(), 0.0f});
     auto c3 = node->convertToWorldSpace(node->getContentSize());
-    auto c4 = node->convertToWorldSpace(ccp(0, node->getContentHeight()));
+    auto c4 = node->convertToWorldSpace({0.0f, node->getContentHeight()});
 
     auto left = fmin(fmin(c1.x, c2.x), fmin(c3.x, c4.x));
     auto right = fmax(fmax(c1.x, c2.x), fmax(c3.x, c4.x));
@@ -117,7 +117,7 @@ void collectDescendants(
         }
     }
 
-    if (isAnyOf<CCMenuItemSpriteExtra*>(node)) {
+    if (isRelaxedAnyOf<CCMenuItemSpriteExtra*>(node)) {
         if (auto sprite = node->getChildByType<CCSprite*>()) {
             if (!sprite->getOpacity()) return;
         }
@@ -127,11 +127,9 @@ void collectDescendants(
         return;
     }
 
-    auto shouldAlsoGetChildren = isAnyOf<ButtonSprite*>(node);
-    auto isValid = isAnyOf<CCSprite*, CCMenuItemToggler*, SimplePlayer*, GJRobotSprite*, GJSpiderSprite*,
-        CCScale9Sprite*, NineSlice*, ScrollLayer*, TextInput*, Label*, Scrollbar*, ListBorders*, ScrollableContentLayer*,
-        InfoAlertButton*, MDTextArea*, LazySprite*, GJDifficultySprite*, EmoteSprite*, CCSpriteWithHue*>(node) ||
-        isRelaxedAnyOf<CCLayerColor*>(node) || (glueFonts ? isRelaxedAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
+    auto isValid = isRelaxedAnyOf<CCNodeRGBA*, CCScrollLayerExt*, TextInput*, Scrollbar*,
+        ListBorders*, ScrollableContentLayer*, MDTextArea*, Label*, CCLayerColor*>(node) ||
+        (glueFonts ? isRelaxedAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
     auto size = getTruerSize(node);
     auto width = size.width;
     auto height = size.height;
@@ -139,9 +137,9 @@ void collectDescendants(
     auto isLargeEnough = width > 0 && height > 0;
     auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
 
-    if ((isValid || shouldAlsoGetChildren) && isSmallEnough && isLargeEnough && isActuallyVisible(node) && (nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
+    if (isValid && isSmallEnough && isLargeEnough && isActuallyVisible(node) && (nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
         visited->push_back(node);
-        if (!shouldAlsoGetChildren) return;
+        return;
     }
 
     for (auto child : node->getChildrenExt()) {
@@ -199,6 +197,10 @@ AntigravityContext* AntigravityContext::create(CCNode* root, CCSize& winSize, fl
     AntigravityContext* object = new AntigravityContext(root, worldId, glueFonts);
     object->setUpWorldBorder(winSize);
 
+    object->material.friction = 0.025f;
+    object->material.rollingResistance = 0.025f;
+    object->material.restitution = 0.5f;
+
     return object;
 }
 
@@ -216,7 +218,7 @@ void updateSlider(Slider* slider) {
     auto theta = -CC_DEGREES_TO_RADIANS(slider->m_groove->getRotation());
     size.setSize(size.width * cos(theta) - size.height * sin(theta), size.width * sin(theta) + size.height * cos(theta));
     slider->setScaledContentSize(size);
-    slider->setAnchorPoint(ccp(0.5, 0.5));
+    slider->setAnchorPoint({0.5f, 0.5f});
     slider->ignoreAnchorPointForPosition(false);
     slider->m_groove->setPosition(size * 0.5f);
     slider->m_touchLogic->setPosition(size * 0.5f);
@@ -291,6 +293,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velo
     auto bodyId = b2CreateBody(worldId, &bodyDef);
 
     auto shapeDef = b2DefaultShapeDef();
+    shapeDef.material = material;
     if (auto opacityNode = typeinfo_cast<CCNodeRGBA*>(node)) {
         shapeDef.density = opacityNode->getOpacity() / 255.0f;
     }

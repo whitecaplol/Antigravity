@@ -1,3 +1,7 @@
+# 0.5.2
+- More relaxed (and robust) collection
+- Better material properties
+
 # 0.5.1
 - Quite a few bug fixes
 - Correcting sliders and fonts
