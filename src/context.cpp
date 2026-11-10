@@ -112,6 +112,9 @@ void collectDescendants(
 
     if (isAnyOf<CCTextInputNode*, Slider*>(node) || isRelaxedAnyOf<CCParticleSystem*>(node)) {
         if (isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
+            if (auto textInput = exact_cast<CCTextInputNode*>(node)) {
+                if (!(textInput->getTextLabel() || textInput->m_textArea)) return;
+            }
             visited->push_back(node);
             return;
         }
@@ -146,6 +149,8 @@ void collectDescendants(
             visited->push_back(node);
             return;
         }
+
+        if (glueFonts && isRelaxedAnyOf<CCLabelBMFont*>(node)) return;
     }
 
     for (auto child : node->getChildrenExt()) {
@@ -231,19 +236,23 @@ void updateSlider(Slider* slider) {
 }
 
 void updateTextInputNode(CCTextInputNode* textInput) {
+    CCNode* primary = textInput->getTextLabel();
+    if (!primary) primary = textInput->m_textArea;
+    auto textAlignment = primary->getAnchorPoint();
     auto size = textInput->getScaledContentSize();
-    textInput->ignoreAnchorPointForPosition(false);
-    if (textInput->m_textArea) {
-        textInput->m_textArea->setPosition(size * 0.5f);
+
+    std::unordered_map<CCNode*, CCPoint> initialPositions;
+
+    for (auto child : textInput->getChildrenExt()) {
+        initialPositions.insert_or_assign(child, getAbsolutePosition(child));
     }
-    if (textInput->m_textLabel) {
-        textInput->m_textLabel->setPosition(size * 0.5f);
-    }
-    if (textInput->m_textField) {
-        textInput->m_textField->setPosition(size * 0.5f);
-    }
-    if (textInput->m_cursor) {
-        textInput->m_cursor->setPosition(size * 0.5f);
+
+    centralizeAnchorPoint(textInput);
+    textInput->setPositionX(textInput->getPositionX() - size.width * textAlignment.x);
+    textInput->setPositionY(textInput->getPositionY() - size.height * textAlignment.y);
+
+    for (auto [child, position] : initialPositions) {
+        child->setPosition(child->getPosition() + (position - getAbsolutePosition(child)));
     }
 }
 
@@ -344,19 +353,23 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
 
     std::erase_if(maps, [this, &winSize](const auto& pair) {
         CCNode* node = pair.first;
-        if (b2Body_IsValid(pair.second) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
-            PriorData expectedData = currentMaps[node];
-            auto sizeDiff = (getTruerSize(node) - expectedData.size);
-            if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0 && abs(sizeDiff.width) <= 0 && abs(sizeDiff.height) <= 0) return false;
-        }
         if (priorContext.contains(node)) {
             auto isGroundLayerSprite = isDescendantOfType<GJGroundLayer*>(node);
             PriorContext ctx = isGroundLayerSprite ? initialContext.at(node) : priorContext.at(node);
-            if (ctx.ref.valid() && !(isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node))) {
-                node->setAnchorPoint(ctx.anchorPoint);
-                node->setPosition(ctx.position);
-                node->setRotation(ctx.rotation);
-                node->ignoreAnchorPointForPosition(ctx.ignoreAnchorPointForPosition);
+
+            if (ctx.ref.valid()) {
+                if (b2Body_IsValid(pair.second) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
+                    PriorData expectedData = currentMaps[node];
+                    auto sizeDiff = (getTruerSize(node) - expectedData.size);
+                    if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0 && abs(sizeDiff.width) <= 0 && abs(sizeDiff.height) <= 0) return false;
+                }
+
+                if (!(isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) || isDescendantOfRelaxedType<CustomSongWidget*>(node)) {
+                    node->setAnchorPoint(ctx.anchorPoint);
+                    node->setPosition(ctx.position);
+                    node->setRotation(ctx.rotation);
+                    node->ignoreAnchorPointForPosition(ctx.ignoreAnchorPointForPosition);
+                }
             }
         }
         if (b2Body_IsValid(pair.second)) {
