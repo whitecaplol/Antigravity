@@ -8,10 +8,13 @@
 	},
 	"id": "whitecaplol.antigravity",
 	"name": "Antigravity",
-	"version": "v0.5.2",
+	"version": "v0.5.3",
 	"developer": "whitecaplol",
 	"description": "Adds gravity to most UI elements",
-	"dependencies": {},
+	"links": {
+		"source": "https://github.com/whitecaplol/Antigravity",
+		"community": "https://discord.com/invite/6s8ZEtgAus"
+	},
 	"settings": {
 		"enabled": {
 			"type": "bool",

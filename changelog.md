@@ -1,4 +1,6 @@
 # 0.5.3
+- Better persistence of positional and angular velocity
+- Text node improvements
 - Refinements
 
 # 0.5.2

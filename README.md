@@ -12,8 +12,11 @@ Makes any UI have gravity (how ironic)
 ## Features
 Adds physics (why not?)
 - Agnostic to any UI layer. In other words: It should work regardless of if it's RobTop's menus or some mod's strange UI.
-    - Currently works, but all anchor points are adjusted. This may cause issues if some UI element really relies on it.
+    - Note that all anchor points are adjusted. This may cause issues if some other mod or UI element really relies on it.
 - Tunable
 
 ## Dependencies
 [`box2d`](https://box2d.org/) (For physics)
+
+## Roadmap
+Dragging objects

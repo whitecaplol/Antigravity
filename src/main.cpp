@@ -58,6 +58,7 @@ class $modify(CCDirector) {
         auto currentGravityX = mod->getSettingValue<float>("gravity-x");
         auto currentGravityY = mod->getSettingValue<float>("gravity-y");
         auto glueFonts = mod->getSettingValue<bool>("glue-fonts");
+        auto dt = fmin(getDeltaTime(), 1.0f / 30);
 
         if (mod->getSettingValue<bool>("enabled") && !resetQueued) {
             for (auto child : contextNodes) {
@@ -67,7 +68,7 @@ class $modify(CCDirector) {
                     auto context = activeLayers[child];
                     context->setGravity(currentGravityX, currentGravityY);
                     context->setGlueFonts(glueFonts);
-                    auto success = context->step(getDeltaTime(), &current, pokeQueued);
+                    auto success = context->step(dt, &current, pokeQueued);
                     if (!success) {
                         delete activeLayers.at(child);
                         activeLayers.erase(child);
