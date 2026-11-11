@@ -272,7 +272,7 @@ CCSize getCCFontSpriteTrueSize(CCFontSprite* fontSprite) {
     return size;
 }
 
-void AntigravityContext::setUpPhysics(CCNode* node, CCSize& winSize, b2Vec2 velocity, float angularVelocity, float halfThickness) {
+void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angularVelocity, float halfThickness) {
     if (!node) return;
 
     if (auto slider = exact_cast<Slider*>(node)) {
@@ -350,18 +350,23 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
     if (!b2World_IsValid(worldId)) return false;
 
     auto winSize = CCDirector::sharedDirector()->getWinSize();
+    std::unordered_map<CCNode*, IntermediateState> justNeedsAReset;
 
-    std::erase_if(maps, [this, &winSize](const auto& pair) {
+    std::erase_if(maps, [this, &winSize, &justNeedsAReset](const auto& pair) {
         CCNode* node = pair.first;
+        b2BodyId bodyId = pair.second;
+
+        bool markForQuickReset = false;
         if (priorContext.contains(node)) {
             auto isGroundLayerSprite = isDescendantOfType<GJGroundLayer*>(node);
             PriorContext ctx = isGroundLayerSprite ? initialContext.at(node) : priorContext.at(node);
 
             if (ctx.ref.valid()) {
-                if (b2Body_IsValid(pair.second) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
+                if (b2Body_IsValid(bodyId) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
                     PriorData expectedData = currentMaps[node];
                     auto sizeDiff = (getTruerSize(node) - expectedData.size);
-                    if ((expectedData.position - getAbsolutePosition(pair.first)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(pair.first)) <= 0 && abs(sizeDiff.width) <= 0 && abs(sizeDiff.height) <= 0) return false;
+                    if ((expectedData.position - getAbsolutePosition(node)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(node)) <= 0 && abs(sizeDiff.width) <= 0 && abs(sizeDiff.height) <= 0) return false;
+                    markForQuickReset = true;
                 }
 
                 if (!(isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) || isDescendantOfRelaxedType<CustomSongWidget*>(node)) {
@@ -369,11 +374,16 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
                     node->setPosition(ctx.position);
                     node->setRotation(ctx.rotation);
                     node->ignoreAnchorPointForPosition(ctx.ignoreAnchorPointForPosition);
+                    markForQuickReset = false;
                 }
             }
         }
-        if (b2Body_IsValid(pair.second)) {
-            b2DestroyBody(pair.second);
+        if (b2Body_IsValid(bodyId)) {
+            if (markForQuickReset) {
+                IntermediateState intermediateState{b2Body_GetLinearVelocity(bodyId), b2Body_GetAngularVelocity(bodyId)};
+                justNeedsAReset.insert_or_assign(node, intermediateState);
+            }
+            b2DestroyBody(bodyId);
         }
         currentMaps.erase(node);
         priorContext.erase(node);
@@ -397,6 +407,11 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
                 b2Body_SetLinearVelocity(id, b2Body_GetLinearVelocity(id) + initialVelocity);
             }
             continue;
+        } else if (justNeedsAReset.contains(node)) {
+            auto intermediate = justNeedsAReset.at(node);
+            setUpPhysics(node, intermediate.velocity, intermediate.angularVelocity);
+            candidateMaps.erase(node); // Probably redundant
+            continue;
         }
         if (!isEditor) {
             if (candidateMaps.contains(node)) {
@@ -406,7 +421,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
                 auto sizeDiff = (getTruerSize(node) - prior.size);
 
                 if (!maps.contains(node->getParent()) && (velocity.getLength() > 0 || abs(angularVelocity) > 0 || abs(sizeDiff.width) > 0 || abs(sizeDiff.height) > 0)) goto update_data; // Sorry
-                setUpPhysics(node, winSize, initialVelocity, 0);
+                setUpPhysics(node, initialVelocity, 0);
                 candidateMaps.erase(node);
             } else {
                 update_data:
@@ -415,7 +430,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             }
         } else {
             if (!maps.contains(node)) {
-                setUpPhysics(node, winSize, initialVelocity, 0);
+                setUpPhysics(node, initialVelocity, 0);
             }
         }
     }
