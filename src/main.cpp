@@ -21,6 +21,22 @@ void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
     }
 }
 
+// Wow
+// #include <Geode/modify/CCTextInputNode.hpp>
+// class $modify(CCTextInputNode) {
+//     bool ccTouchBegan(CCTouch* touch, CCEvent* event) {
+//         touch->setTouchInfo(CCTextInputNode::getID(), float x, float y)
+//
+//         auto point = convertTouchToNodeSpace(touch);
+//         auto result = 0 <= point.x && point.x <= getContentWidth() && 0 <= point.y && point.y <= getContentHeight();
+//         log::debug("{}", result);
+//
+//         auto trueResult = CCTextInputNode::ccTouchBegan(touch, event);
+//         log::debug("{}", trueResult);
+//         return trueResult;
+//     }
+// };
+
 // Because CCDirectors do not support fields
 std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
 bool resetQueued = false;

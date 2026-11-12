@@ -174,7 +174,9 @@ void centralizeAnchorPoint(CCNode* node) {
         node->ignoreAnchorPointForPosition(false);
         node->setAnchorPoint({0, 0});
     }
-    node->setPosition(node->getParent()->convertToNodeSpace(getAbsolutePosition(node)));
+    auto anchorPoint = node->getAnchorPoint();
+    node->setPositionX(node->getPositionX() + (0.5 - anchorPoint.x) * node->getScaledContentWidth());
+    node->setPositionY(node->getPositionY() + (0.5 - anchorPoint.y) * node->getScaledContentHeight());
     node->setAnchorPoint({0.5, 0.5});
 }
 
