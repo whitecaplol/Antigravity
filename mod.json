@@ -15,6 +15,7 @@
 		"source": "https://github.com/whitecaplol/Antigravity",
 		"community": "https://discord.com/invite/6s8ZEtgAus"
 	},
+	"tags": ["joke", "universal", "offline"],
 	"settings": {
 		"enabled": {
 			"type": "bool",

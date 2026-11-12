@@ -1,5 +1,15 @@
 #include "context.hpp"
 
+PriorContext constructPriorContext(CCNode* node) {
+    return PriorContext{
+        WeakRef(node),
+        node->getAnchorPoint(),
+        node->getPosition(),
+        node->getRotation(),
+        node->isIgnoreAnchorPointForPosition()
+    };
+}
+
 CCPoint getAbsolutePosition(CCNode* node) {
     if (!node) return CCPointZero;
     return node->convertToWorldSpace(node->getContentSize() * 0.5);
@@ -205,7 +215,7 @@ AntigravityContext* AntigravityContext::create(CCNode* root, CCSize& winSize, fl
 
     if (!b2World_IsValid(worldId)) return nullptr;
 
-    AntigravityContext* object = new AntigravityContext(root, worldId, glueFonts);
+    AntigravityContext* object = new AntigravityContext(root, worldId, glueFonts, worldDef.gravity);
     object->setUpWorldBorder(winSize);
 
     object->material.friction = 0.025f;
@@ -235,7 +245,7 @@ void updateSlider(Slider* slider) {
     slider->m_touchLogic->setPosition(size * 0.5f);
 }
 
-void updateTextInputNode(CCTextInputNode* textInput) {
+void updateTextInputNode(CCTextInputNode* textInput, bool reverse = false) {
     CCNode* primary = textInput->getTextLabel();
     if (!primary) primary = textInput->m_textArea;
     auto textAlignment = primary->getAnchorPoint();
@@ -248,8 +258,9 @@ void updateTextInputNode(CCTextInputNode* textInput) {
     }
 
     centralizeAnchorPoint(textInput);
-    textInput->setPositionX(textInput->getPositionX() - size.width * textAlignment.x);
-    textInput->setPositionY(textInput->getPositionY() - size.height * textAlignment.y);
+    int scale = reverse ? 1 : -1;
+    textInput->setPositionX(textInput->getPositionX() + scale * size.width * textAlignment.x);
+    textInput->setPositionY(textInput->getPositionY() + scale * size.height * textAlignment.y);
 
     for (auto [child, position] : initialPositions) {
         child->setPosition(child->getPosition() + (position - getAbsolutePosition(child)));
@@ -281,13 +292,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
         updateTextInputNode(textInput);
     }
 
-    priorContext.insert_or_assign(node, PriorContext{
-        WeakRef(node),
-        node->getAnchorPoint(),
-        node->getPosition(),
-        node->getRotation(),
-        node->isIgnoreAnchorPointForPosition()
-    });
+    priorContext.insert_or_assign(node, constructPriorContext(node));
 
     if (!initialContext.contains(node)) {
         initialContext.insert_or_assign(node, priorContext.at(node));
@@ -385,6 +390,14 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             }
             b2DestroyBody(bodyId);
         }
+        if (markForQuickReset) {
+            auto position = currentMaps[node].position;
+            auto rotation = currentMaps[node].angle;
+            node->setPosition(
+                node->getParent()->convertToNodeSpace({position.x, position.y})
+            );
+            setAbsoluteRotation(node, rotation);
+        }
         currentMaps.erase(node);
         priorContext.erase(node);
         return true;
@@ -435,6 +448,11 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
         }
     }
 
+    if (isEditor) {
+        auto zoom = typeinfo_cast<LevelEditorLayer*>(root)->m_drawGridLayer->getParent()->getScale(); // This is probably not ideal (will be reevaluated in beta 1. I suspect zoom is not being properly hooked?)
+        b2World_SetGravity(worldId, b2MulSV(zoom, gravity));
+    }
+
     b2World_Step(worldId, dt, 4);
 
     for (auto node : nodes) {
@@ -471,6 +489,10 @@ void AntigravityContext::reset() {
         node->setPosition(ctx.position);
         node->setRotation(ctx.rotation);
         node->ignoreAnchorPointForPosition(ctx.ignoreAnchorPointForPosition);
+
+        if (auto textInput = exact_cast<CCTextInputNode*>(node)) {
+            updateTextInputNode(textInput, true);
+        }
     }
 
     currentMaps.clear();
