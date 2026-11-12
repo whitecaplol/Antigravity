@@ -392,14 +392,6 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             }
             b2DestroyBody(bodyId);
         }
-        if (markForQuickReset) {
-            auto position = currentMaps[node].position;
-            auto rotation = currentMaps[node].angle;
-            node->setPosition(
-                node->getParent()->convertToNodeSpace({position.x, position.y})
-            );
-            setAbsoluteRotation(node, rotation);
-        }
         currentMaps.erase(node);
         priorContext.erase(node);
         return true;
