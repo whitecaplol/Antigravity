@@ -1,3 +1,8 @@
+# 0.5.4
+- Stronger persistence
+- Reduced reliance on absolute position when centering anchor points
+- Fix up the text nodes (with a bit of help from Geode's own [`TextInputNodeFix`](https://github.com/geode-sdk/geode/blob/main/loader/src/ui/nodes/TextInput.cpp))
+
 # 0.5.3
 - Better persistence of positional and angular velocity
 - Text node improvements
