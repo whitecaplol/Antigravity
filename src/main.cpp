@@ -40,8 +40,62 @@ class $modify(CCTextInputNode) {
     }
 };
 
+// This is cursed
+class TouchLayer : public CCNode, public CCTargetedTouchDelegate {
+private:
+    bool isActive = false;
+    CCTouch* touch = nullptr;
+protected:
+    bool init(const CCSize& winSize) {
+        if (!CCNode::init())
+            return false;
+
+        setContentSize(winSize);
+        setZOrder(INT_MAX);
+        return true;
+    }
+public:
+    static TouchLayer* create(const CCSize& winSize) {
+        auto ret = new TouchLayer();
+        if (ret->init(winSize)) {
+            ret->autorelease();
+            return ret;
+        }
+
+        delete ret;
+        return nullptr;
+    }
+
+    bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
+        isActive = true;
+        this->touch = touch;
+        return true;
+    }
+
+    void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
+        this->touch = touch;
+    }
+
+    void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
+        isActive = false;
+    }
+
+    void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
+        isActive = false;
+    }
+
+    bool isTouchActive() {
+        return isActive;
+    }
+
+    CCTouch* getTouch() {
+        return touch;
+    }
+};
+
 // Because CCDirectors do not support fields
 std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
+TouchLayer* touchLayer = nullptr;
 bool resetQueued = false;
 bool pokeQueued = false;
 bool pauseAntigravity = false;
@@ -49,6 +103,13 @@ bool pauseAntigravity = false;
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
     void drawScene() {
+        auto winSize = getWinSize();
+
+        if (!touchLayer) {
+            touchLayer = TouchLayer::create(winSize);
+            getTouchDispatcher()->addTargetedDelegate(touchLayer, INT_MIN, false);
+        }
+
         if (pauseAntigravity && !resetQueued) {
             CCDirector::drawScene();
             return;
@@ -60,8 +121,11 @@ class $modify(CCDirector) {
             return;
         }
 
+        if (touchLayer->getParent() != scene) {
+            touchLayer->setParent(scene);
+        }
+
         auto mod = Mod::get();
-        auto winSize = getWinSize();
 
         std::vector<CCNode*> contextNodes;
         collectChildrenForContexts(scene, &contextNodes);
