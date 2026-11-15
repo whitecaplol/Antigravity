@@ -311,6 +311,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
     bodyDef.position = {position.x, position.y};
     float mathematicalAngle = -CC_DEGREES_TO_RADIANS(getAbsoluteRotation(node));
     bodyDef.rotation = b2MakeRot(mathematicalAngle);
+    bodyDef.userData = node;
 
     auto bodyId = b2CreateBody(worldId, &bodyDef);
 
@@ -341,6 +342,12 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
 
         auto downBox = b2MakeOffsetBox(halfSize.width, halfThickness, {0, -(halfSize.height-halfThickness)}, b2Rot_identity);
         b2CreatePolygonShape(bodyId, &shapeDef, &downBox);
+
+        auto queryBox = b2MakeBox(halfSize.width, halfSize.height);
+        auto queryShapeDef = b2DefaultShapeDef();
+        queryShapeDef.isSensor = true;
+        queryShapeDef.density = 0.0f;
+        b2CreatePolygonShape(bodyId, &queryShapeDef, &queryBox);
     }
 
     auto mass = b2Body_GetMass(bodyId);
@@ -351,6 +358,32 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
 
     PriorData data{getAbsolutePosition(node), getTruerSize(node), getAbsoluteRotation(node)};
     currentMaps.insert_or_assign(node, data);
+}
+
+struct CallbackContext {
+    CCNode* result = nullptr;
+    std::unordered_map<CCNode*, PriorData>* currentMaps;
+};
+
+bool handleCallback(b2ShapeId id, void* context) {
+    auto bodyId = b2Shape_GetBody(id);
+    auto ctx = (CallbackContext*) context;
+    auto node = (CCNode*) b2Body_GetUserData(bodyId);
+    if (ctx->currentMaps->contains(node)) {
+        auto data = ctx->currentMaps->at(node);
+        if (!ctx->result || data.size < ctx->currentMaps->at(ctx->result).size) {
+            ctx->result = node;
+        }
+    }
+    return true;
+}
+
+void AntigravityContext::beginDrag(b2Vec2 position) {
+    if (!b2World_IsValid(worldId)) return;
+    auto proxy = b2MakeProxy(&position, 1, 0.125f);
+    CallbackContext ctx{nullptr, &currentMaps};
+    b2World_OverlapShape(worldId, b2Pos_zero, &proxy, b2DefaultQueryFilter(), handleCallback, &ctx);
+    currentlyDragging = ctx.result;
 }
 
 bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke) {

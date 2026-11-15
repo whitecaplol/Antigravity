@@ -56,11 +56,12 @@ private:
     std::unordered_map<CCNode*, b2BodyId> maps;
     std::unordered_map<CCNode*, PriorContext> priorContext;
     std::unordered_map<CCNode*, PriorContext> initialContext;
+    b2SurfaceMaterial material = b2DefaultSurfaceMaterial();
     CCNode* root;
     CCDirector* currentDirector;
-    b2WorldId worldId = b2_nullWorldId;
     b2Vec2 gravity = b2Vec2_zero;
-    b2SurfaceMaterial material = b2DefaultSurfaceMaterial();
+    b2WorldId worldId = b2_nullWorldId;
+    CCNode* currentlyDragging;
     bool isEditor;
     bool glueFonts;
 
@@ -72,6 +73,9 @@ public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f, bool glueFonts = true);
 
     bool step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke);
+    void beginDrag(b2Vec2 click);
+    void moveDrag(b2Vec2 click) {};
+    void endDrag() {};
     void setGravity(float gravityX, float gravityY);
     void setGlueFonts(bool set);
     void reset();

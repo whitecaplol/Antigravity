@@ -43,8 +43,9 @@ class $modify(CCTextInputNode) {
 // This is cursed
 class TouchLayer : public CCNode, public CCTargetedTouchDelegate {
 private:
+    b2Vec2 position = b2Vec2_zero;
     bool isActive = false;
-    CCTouch* touch = nullptr;
+    bool firstQuerySinceNewActive = false;
 protected:
     bool init(const CCSize& winSize) {
         if (!CCNode::init())
@@ -67,29 +68,37 @@ public:
     }
 
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
+        firstQuerySinceNewActive = true;
         isActive = true;
-        this->touch = touch;
+        position = b2Vec2{touch->getLocation().x, touch->getLocation().y};
         return true;
     }
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
-        this->touch = touch;
+        position = b2Vec2{touch->getLocation().x, touch->getLocation().y};
     }
 
     void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
+        position = b2Vec2_zero;
         isActive = false;
     }
 
     void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
+        position = b2Vec2_zero;
         isActive = false;
+    }
+
+    bool isFirstQuerySinceNewActive() { // "New All" ahh naming
+        return firstQuerySinceNewActive;
     }
 
     bool isTouchActive() {
         return isActive;
     }
 
-    CCTouch* getTouch() {
-        return touch;
+    b2Vec2 getTouch() {
+        firstQuerySinceNewActive = false;
+        return position;
     }
 };
 
@@ -151,6 +160,17 @@ class $modify(CCDirector) {
                     auto context = activeLayers[child];
                     context->setGravity(currentGravityX, currentGravityY);
                     context->setGlueFonts(glueFonts);
+                    if (child == contextNodes.back()) {
+                        if (touchLayer->isTouchActive()) {
+                            if (touchLayer->isFirstQuerySinceNewActive()) {
+                                context->beginDrag(touchLayer->getTouch());
+                            } else {
+                                context->moveDrag(touchLayer->getTouch());
+                            }
+                        } else {
+                            context->endDrag();
+                        }
+                    }
                     auto success = context->step(dt, &current, pokeQueued);
                     if (!success) {
                         delete activeLayers.at(child);
