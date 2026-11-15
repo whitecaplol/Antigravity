@@ -108,7 +108,7 @@ void collectDescendants(
             }
             return;
         }
-        if (typeinfo_cast<GameObject*>(node) && isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
+        if (!isAnyOf<PlayerObject*>(node) && isAnyOf<GameObject*>(node) && isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
             return;
         }
@@ -384,6 +384,14 @@ void AntigravityContext::beginDrag(b2Vec2 position) {
     CallbackContext ctx{nullptr, &currentMaps};
     b2World_OverlapShape(worldId, b2Pos_zero, &proxy, b2DefaultQueryFilter(), handleCallback, &ctx);
     currentlyDragging = ctx.result;
+}
+
+void AntigravityContext::moveDrag(b2Vec2 click) {
+    if (!currentlyDragging) return;
+}
+
+void AntigravityContext::endDrag() {
+    currentlyDragging = nullptr;
 }
 
 bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke) {

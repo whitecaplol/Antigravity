@@ -1,3 +1,7 @@
+# 1.0.0
+- Dragging!
+- (This is coming soon)
+
 # 0.5.4
 - Stronger persistence
 - Reduced reliance on absolute position when centering anchor points

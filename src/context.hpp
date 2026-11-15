@@ -74,8 +74,8 @@ public:
 
     bool step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke);
     void beginDrag(b2Vec2 click);
-    void moveDrag(b2Vec2 click) {};
-    void endDrag() {};
+    void moveDrag(b2Vec2 click);
+    void endDrag();
     void setGravity(float gravityX, float gravityY);
     void setGlueFonts(bool set);
     void reset();
