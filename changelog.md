@@ -2,6 +2,9 @@
 - Dragging!
 - (This is coming soon)
 
+# 0.5.5
+- Geode 6.0.0-alpha.2 bump
+
 # 0.5.4
 - Stronger persistence
 - Reduced reliance on absolute position when centering anchor points

@@ -199,7 +199,7 @@ void AntigravityContext::setUpWorldBorder(CCSize& winSize) {
     auto borderBodyDef = b2DefaultBodyDef();
     borderBodyDef.type = b2_staticBody;
 
-    auto borderBodyId = b2CreateBody(worldId, &borderBodyDef);
+    borderId = b2CreateBody(worldId, &borderBodyDef);
 
     b2Vec2 vertices[4] = {{0, 0}, {0, winSize.height}, {winSize.width, winSize.height}, {winSize.width, 0}};
     auto chainDef = b2DefaultChainDef();
@@ -207,7 +207,7 @@ void AntigravityContext::setUpWorldBorder(CCSize& winSize) {
     chainDef.pointCount = 4;
     chainDef.isLoop = true;
 
-    b2CreateChain(borderBodyId, &chainDef);
+    b2CreateChain(borderId, &chainDef);
 };
 
 AntigravityContext* AntigravityContext::create(CCNode* root, CCSize& winSize, float gravityX, float gravityY, bool glueFonts) {
@@ -285,6 +285,14 @@ CCSize getCCFontSpriteTrueSize(CCFontSprite* fontSprite) {
     return size;
 }
 
+inline void* makeObjectTypePointer(ObjectType k) {
+    return (void*)(intptr_t)(k);
+}
+
+inline ObjectType getObjectTypeValue(void* ptr) {
+    return (ObjectType)(intptr_t)(ptr);
+}
+
 void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angularVelocity, float halfThickness) {
     if (!node) return;
 
@@ -326,7 +334,8 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
 
     if (isAnyOf<CircleButtonSprite*>(node)) {
         b2Circle circle = {{0.0f, 0.0f}, 0.5f * (halfSize.width + halfSize.height)};
-        b2CreateCircleShape(bodyId, &shapeDef, &circle);
+        auto shapeId = b2CreateCircleShape(bodyId, &shapeDef, &circle);
+        b2Shape_SetUserData(shapeId, makeObjectTypePointer(ObjectType::Circle));
     } else if (doSolidBox) {
         auto box = b2MakeBox(halfSize.width, halfSize.height);
         b2CreatePolygonShape(bodyId, &shapeDef, &box);
@@ -360,6 +369,68 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
     currentMaps.insert_or_assign(node, data);
 }
 
+void AntigravityContext::updateShapes(CCNode* node, float halfThickness) {
+    auto bodyId = maps.at(node);
+    if (!b2Body_IsValid(bodyId)) return;
+
+    auto estNumShapes = b2Body_GetShapeCount(bodyId);
+    b2ShapeId shapeArray[8];
+    auto actualNumShapes = b2Body_GetShapes(bodyId, shapeArray, estNumShapes);
+
+    auto halfSize = (isAnyOf<CCFontSprite*>(node) ? getCCFontSpriteTrueSize(exact_cast<CCFontSprite*>(node)) : getTruerSize(node)) * 0.5f;
+    halfSize.setSize(fmax(halfSize.width, halfThickness), fmax(halfSize.height, halfThickness));
+
+    auto doSolidBox = isAnyOf<CCMenuItemSpriteExtra*, CCTextInputNode*, Slider*>(node) ||
+        isRelaxedAnyOf<GameObject*, Scrollbar*, TextInput*, Label*, CCFontSprite*>(node);
+
+    if (isAnyOf<CircleButtonSprite*>(node)) {
+        for (auto shape : shapeArray) {
+            if (b2Shape_IsValid(shape) && getObjectTypeValue(b2Shape_GetUserData(shape)) == ObjectType::Circle) {
+                b2Circle circle = {{0.0f, 0.0f}, 0.5f * (halfSize.width + halfSize.height)};
+                b2Shape_SetCircle(shape, &circle);
+                break;
+            }
+        }
+    } else if (doSolidBox) {
+        for (auto shape : shapeArray) {
+            if (b2Shape_IsValid(shape) && getObjectTypeValue(b2Shape_GetUserData(shape)) == ObjectType::Solid) {
+                auto box = b2MakeBox(halfSize.width, halfSize.height);
+                b2Shape_SetPolygon(shape, &box);
+                break;
+            }
+        }
+    } else {
+        for (auto shape : shapeArray) {
+            if (!b2Shape_IsValid(shape)) continue;
+            b2Polygon box;
+            switch (getObjectTypeValue(b2Shape_GetUserData(shape))) {
+                case ObjectType::HollowLeft: {
+                    box = b2MakeOffsetBox(halfThickness, halfSize.height, {-(halfSize.width-halfThickness), 0}, b2Rot_identity);
+                    break;
+                }
+                case ObjectType::HollowRight: {
+                    box = b2MakeOffsetBox(halfThickness, halfSize.height, {(halfSize.width-halfThickness), 0}, b2Rot_identity);
+                    break;
+                }
+                case ObjectType::HollowUp: {
+                    box = b2MakeOffsetBox(halfSize.width, halfThickness, {0, (halfSize.height-halfThickness)}, b2Rot_identity);;
+                    break;
+                }
+                case ObjectType::HollowDown: {
+                    box = b2MakeOffsetBox(halfSize.width, halfThickness, {0, -(halfSize.height-halfThickness)}, b2Rot_identity);
+                    break;
+                }
+                case ObjectType::HollowSensor: {
+                    box = b2MakeBox(halfSize.width, halfSize.height);
+                    break;
+                }
+                default: continue;
+            }
+            b2Shape_SetPolygon(shape, &box);
+        }
+    }
+}
+
 struct CallbackContext {
     CCNode* result = nullptr;
     std::unordered_map<CCNode*, PriorData>* currentMaps;
@@ -383,14 +454,40 @@ void AntigravityContext::beginDrag(b2Vec2 position) {
     auto proxy = b2MakeProxy(&position, 1, 0.125f);
     CallbackContext ctx{nullptr, &currentMaps};
     b2World_OverlapShape(worldId, b2Pos_zero, &proxy, b2DefaultQueryFilter(), handleCallback, &ctx);
-    currentlyDragging = ctx.result;
+
+    auto node = ctx.result;
+    currentlyDragging = node;
+
+    if (!currentlyDragging.valid()) return;
+
+    auto bodyId = maps.at(node);
+    auto motorDef = b2DefaultMotorJointDef();
+
+    motorDef.base.bodyIdA = borderId;
+    motorDef.base.bodyIdB = bodyId;
+    motorDef.base.localFrameA.p = position;
+    motorDef.base.localFrameB.p = b2Body_GetLocalPoint(bodyId, position);
+    motorDef.linearHertz = 15.0f;
+    motorDef.linearDampingRatio = 1.0f;
+    motorDef.angularDampingRatio = 1.0f;
+    motorDef.maxSpringForce = 10000 * b2Body_GetMass(bodyId);
+
+    dragJointId = b2CreateMotorJoint(worldId, &motorDef);
+
+    b2Body_SetAwake(bodyId, true);
+    moveDrag(position);
 }
 
-void AntigravityContext::moveDrag(b2Vec2 click) {
-    if (!currentlyDragging) return;
+void AntigravityContext::moveDrag(b2Vec2 position) {
+    if (!b2World_IsValid(worldId) || !currentlyDragging.valid() || !b2Joint_IsValid(dragJointId)) return;
+    b2Joint_SetLocalFrameA(dragJointId, {position, b2Rot_identity});
 }
 
 void AntigravityContext::endDrag() {
+    if (b2Joint_IsValid(dragJointId)) {
+        b2DestroyJoint(dragJointId);
+    }
+    dragJointId = b2_nullJointId;
     currentlyDragging = nullptr;
 }
 
@@ -412,8 +509,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             if (ctx.ref.valid()) {
                 if (b2Body_IsValid(bodyId) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
                     PriorData expectedData = currentMaps[node];
-                    auto sizeDiff = (getTruerSize(node) - expectedData.size);
-                    if ((expectedData.position - getAbsolutePosition(node)).getLength() <= 0 && abs(expectedData.angle - getAbsoluteRotation(node)) <= 0 && abs(sizeDiff.width) <= 0 && abs(sizeDiff.height) <= 0) return false;
+                    if ((expectedData.position - getAbsolutePosition(node)).getLength() <= 1e-4 && abs(expectedData.angle - getAbsoluteRotation(node)) <= 1e-4) return false;
                     markForQuickReset = true;
                 }
 
@@ -450,6 +546,12 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
 
     for (auto node : nodes) {
         if (maps.contains(node)) {
+            auto data = currentMaps.at(node);
+            auto sizeDiff = (getTruerSize(node) - data.size);
+            if (abs(sizeDiff.width) > 0 || abs(sizeDiff.height) > 0) {
+                updateShapes(node);
+            }
+
             auto id = maps.at(node);
             if (poke && b2Body_GetType(id) != b2_staticBody) {
                 b2Body_SetLinearVelocity(id, b2Body_GetLinearVelocity(id) + initialVelocity);

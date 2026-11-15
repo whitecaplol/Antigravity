@@ -2,6 +2,16 @@
 
 using namespace geode::prelude;
 
+enum ObjectType {
+    Circle,
+    Solid,
+    HollowRight,
+    HollowUp,
+    HollowLeft,
+    HollowDown,
+    HollowSensor
+};
+
 struct PriorData {
     CCPoint position;
     CCSize size;
@@ -57,11 +67,13 @@ private:
     std::unordered_map<CCNode*, PriorContext> priorContext;
     std::unordered_map<CCNode*, PriorContext> initialContext;
     b2SurfaceMaterial material = b2DefaultSurfaceMaterial();
+    WeakRef<CCNode> currentlyDragging = nullptr;
+    b2JointId dragJointId = b2_nullJointId;
     CCNode* root;
     CCDirector* currentDirector;
     b2Vec2 gravity = b2Vec2_zero;
     b2WorldId worldId = b2_nullWorldId;
-    CCNode* currentlyDragging;
+    b2BodyId borderId = b2_nullBodyId;
     bool isEditor;
     bool glueFonts;
 
@@ -69,6 +81,7 @@ private:
 
     void setUpWorldBorder(CCSize& winSize);
     void setUpPhysics(CCNode* node, b2Vec2 velocity = {0.0f, 0.0f}, float angularVelocity = 0.0f, float halfThickness = 0.5f);
+    void updateShapes(CCNode* node, float halfThickness = 0.5f);
 public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f, bool glueFonts = true);
 
