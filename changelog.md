@@ -1,6 +1,5 @@
-# 1.0.0
-- Dragging!
-- (This is coming soon)
+# 0.6.0
+- Dragging (preview)
 
 # 0.5.5
 - Geode 6.0.0-alpha.2 bump

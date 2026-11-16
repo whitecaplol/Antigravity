@@ -142,8 +142,8 @@ void collectDescendants(
 
     if (isAnyOf<CCSpriteBatchNode*>(node)) return;
 
-    auto isValid = isRelaxedAnyOf<CCNodeRGBA*, CCScrollLayerExt*, TextInput*, Scrollbar*, Label*,
-        ListBorders*, ScrollableContentLayer*, MDTextArea*, CCLayerColor*>(node) ||
+    auto isValid = isRelaxedAnyOf<CCNodeRGBA*, CCTouchClipper*, TextInput*,
+        Scrollbar*, Label*, ListBorders*, MDTextArea*, CCLayerColor*>(node) ||
         (glueFonts ? isRelaxedAnyOf<CCLabelBMFont*>(node) : isAnyOf<CCFontSprite*>(node));
 
     if (isValid) {
@@ -155,7 +155,7 @@ void collectDescendants(
         auto dontCareAboutViewport = isDescendantOfRelaxedType<ScrollableContentLayer*>(node);
         auto needOnlyIntersect = isAnyOf<CCScale9Sprite*, NineSlice*>(node);
 
-        if (isSmallEnough && isLargeEnough && isActuallyVisible(node) && (dontCareAboutViewport || nodeIsFullyInsideViewport(node, winSize) || (needOnlyIntersect && nodeIntersectsViewport(node, winSize)))) {
+        if (isSmallEnough && isLargeEnough && isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
             return;
         }
@@ -443,6 +443,10 @@ bool handleCallback(b2ShapeId id, void* context) {
     if (ctx->currentMaps->contains(node)) {
         auto data = ctx->currentMaps->at(node);
         if (!ctx->result || data.size < ctx->currentMaps->at(ctx->result).size) {
+            if (isRelaxedAnyOf<CCTouchClipper*, Slider*>(node)) {
+                ctx->result = nullptr;
+                return false;
+            }
             ctx->result = node;
         }
     }
@@ -451,6 +455,11 @@ bool handleCallback(b2ShapeId id, void* context) {
 
 void AntigravityContext::beginDrag(b2Vec2 position) {
     if (!b2World_IsValid(worldId)) return;
+    if (isEditor) {
+        auto levelEditorLayer = typeinfo_cast<LevelEditorLayer*>(root);
+        if (!levelEditorLayer || !levelEditorLayer->m_editorUI || !levelEditorLayer->m_editorUI->m_freeMoveEnabled) return;
+    }
+
     auto proxy = b2MakeProxy(&position, 1, 0.125f);
     CallbackContext ctx{nullptr, &currentMaps};
     b2World_OverlapShape(worldId, b2Pos_zero, &proxy, b2DefaultQueryFilter(), handleCallback, &ctx);
@@ -471,6 +480,7 @@ void AntigravityContext::beginDrag(b2Vec2 position) {
     motorDef.linearDampingRatio = 1.0f;
     motorDef.angularDampingRatio = 1.0f;
     motorDef.maxSpringForce = 10000 * b2Body_GetMass(bodyId);
+    motorDef.base.collideConnected = true;
 
     dragJointId = b2CreateMotorJoint(worldId, &motorDef);
 

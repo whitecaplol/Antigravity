@@ -17,4 +17,4 @@ Adds physics (why not?)
 [`box2d`](https://box2d.org/) (For physics)
 
 ## Roadmap
-Dragging objects
+Refinements

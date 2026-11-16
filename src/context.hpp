@@ -80,8 +80,8 @@ private:
     AntigravityContext(CCNode* root, b2WorldId worldId, bool glueFonts, b2Vec2 gravity) : root(root), worldId(worldId), isEditor(isAnyOf<LevelEditorLayer*>(root)), glueFonts(glueFonts), gravity(gravity) {}
 
     void setUpWorldBorder(CCSize& winSize);
-    void setUpPhysics(CCNode* node, b2Vec2 velocity = {0.0f, 0.0f}, float angularVelocity = 0.0f, float halfThickness = 0.5f);
-    void updateShapes(CCNode* node, float halfThickness = 0.5f);
+    void setUpPhysics(CCNode* node, b2Vec2 velocity = {0.0f, 0.0f}, float angularVelocity = 0.0f, float halfThickness = 1.0f);
+    void updateShapes(CCNode* node, float halfThickness = 1.0f);
 public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f, bool glueFonts = true);
 

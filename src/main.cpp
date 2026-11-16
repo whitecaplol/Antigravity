@@ -43,22 +43,26 @@ class $modify(CCTextInputNode) {
 // This is cursed
 class TouchLayer : public CCNode, public CCTargetedTouchDelegate {
 private:
+    b2Vec2 initialPosition = b2Vec2_zero;
     b2Vec2 position = b2Vec2_zero;
+    CCDirector* director;
     bool isActive = false;
     bool firstQuerySinceNewActive = false;
+    bool shouldDisableOnTouchEnd = false;
 protected:
-    bool init(const CCSize& winSize) {
+    bool init(const CCSize& winSize, CCDirector* director) {
         if (!CCNode::init())
             return false;
 
+        this->director = director;
         setContentSize(winSize);
         setZOrder(INT_MAX);
         return true;
     }
 public:
-    static TouchLayer* create(const CCSize& winSize) {
+    static TouchLayer* create(const CCSize& winSize, CCDirector* director) {
         auto ret = new TouchLayer();
-        if (ret->init(winSize)) {
+        if (ret->init(winSize, director)) {
             ret->autorelease();
             return ret;
         }
@@ -69,6 +73,7 @@ public:
 
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
         firstQuerySinceNewActive = true;
+        shouldDisableOnTouchEnd = false;
         isActive = true;
         position = b2Vec2{touch->getLocation().x, touch->getLocation().y};
         return true;
@@ -76,16 +81,28 @@ public:
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
         position = b2Vec2{touch->getLocation().x, touch->getLocation().y};
+        if (!firstQuerySinceNewActive && b2Length(initialPosition - position) > 2.0f) {
+            shouldDisableOnTouchEnd = true;
+        }
     }
 
     void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
         position = b2Vec2_zero;
+        initialPosition = b2Vec2_zero;
         isActive = false;
+        if (shouldDisableOnTouchEnd) {
+            CCSet set; // I love touchesCancelled
+            set.addObject(touch);
+            director->getTouchDispatcher()->touchesCancelled(&set, event);
+        };
+        shouldDisableOnTouchEnd = false;
     }
 
     void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
         position = b2Vec2_zero;
+        initialPosition = b2Vec2_zero;
         isActive = false;
+        shouldDisableOnTouchEnd = false;
     }
 
     bool isFirstQuerySinceNewActive() { // "New All" ahh naming
@@ -97,6 +114,9 @@ public:
     }
 
     b2Vec2 getTouch() {
+        if (firstQuerySinceNewActive) {
+            initialPosition = position;
+        }
         firstQuerySinceNewActive = false;
         return position;
     }
@@ -115,7 +135,7 @@ class $modify(CCDirector) {
         auto winSize = getWinSize();
 
         if (!touchLayer) {
-            touchLayer = TouchLayer::create(winSize);
+            touchLayer = TouchLayer::create(winSize, this);
             getTouchDispatcher()->addTargetedDelegate(touchLayer, INT_MIN, false);
         }
 
@@ -147,6 +167,7 @@ class $modify(CCDirector) {
             return true;
         });
 
+        auto canDrag = mod->getSettingValue<bool>("enable-drag");
         auto currentGravityX = mod->getSettingValue<float>("gravity-x");
         auto currentGravityY = mod->getSettingValue<float>("gravity-y");
         auto glueFonts = mod->getSettingValue<bool>("glue-fonts");
@@ -160,7 +181,7 @@ class $modify(CCDirector) {
                     auto context = activeLayers[child];
                     context->setGravity(currentGravityX, currentGravityY);
                     context->setGlueFonts(glueFonts);
-                    if (child == contextNodes.back()) {
+                    if (canDrag && child == contextNodes.back()) {
                         if (touchLayer->isTouchActive()) {
                             if (touchLayer->isFirstQuerySinceNewActive()) {
                                 context->beginDrag(touchLayer->getTouch());
@@ -170,6 +191,8 @@ class $modify(CCDirector) {
                         } else {
                             context->endDrag();
                         }
+                    } else {
+                        context->endDrag();
                     }
                     auto success = context->step(dt, &current, pokeQueued);
                     if (!success) {

@@ -8,7 +8,7 @@
 	},
 	"id": "whitecaplol.antigravity",
 	"name": "Antigravity",
-	"version": "v0.5.4",
+	"version": "v0.6.0",
 	"developer": "whitecaplol",
 	"description": "Adds gravity to most UI elements",
 	"links": {
@@ -36,6 +36,12 @@
 			"name": "Glue fonts",
 			"description": "Keep characters coherent",
 			"default": true
+		},
+		"enable-drag": {
+			"type": "bool",
+			"name": "Enable Dragging",
+			"description": "Enable dragging of UI elements affected by Antigravity.",
+			"default": false
 		},
 		"gravity-x": {
 			"type": "float",
