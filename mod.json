@@ -38,6 +38,7 @@
 			"default": true
 		},
 		"enable-drag": {
+			"enable-if": "enabled",
 			"type": "bool",
 			"name": "Enable Dragging",
 			"description": "Enable dragging of UI elements affected by Antigravity.",

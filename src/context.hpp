@@ -86,7 +86,7 @@ public:
     static AntigravityContext* create(CCNode* root, CCSize& winSize, float gravityX = 0.0f, float gravityY = 0.0f, bool glueFonts = true);
 
     bool step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke);
-    void beginDrag(b2Vec2 click);
+    bool beginDrag(b2Vec2 click);
     void moveDrag(b2Vec2 click);
     void endDrag();
     void setGravity(float gravityX, float gravityY);

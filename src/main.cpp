@@ -45,7 +45,7 @@ class TouchLayer : public CCNode, public CCTargetedTouchDelegate {
 private:
     b2Vec2 initialPosition = b2Vec2_zero;
     b2Vec2 position = b2Vec2_zero;
-    CCDirector* director;
+    WeakRef<CCDirector> director = nullptr;
     bool isActive = false;
     bool firstQuerySinceNewActive = false;
     bool shouldDisableOnTouchEnd = false;
@@ -56,7 +56,7 @@ protected:
 
         this->director = director;
         setContentSize(winSize);
-        setZOrder(INT_MAX);
+        setZOrder(1 << 15);
         return true;
     }
 public:
@@ -90,10 +90,10 @@ public:
         position = b2Vec2_zero;
         initialPosition = b2Vec2_zero;
         isActive = false;
-        if (shouldDisableOnTouchEnd) {
+        if (shouldDisableOnTouchEnd && director.valid()) {
             CCSet set; // I love touchesCancelled
             set.addObject(touch);
-            director->getTouchDispatcher()->touchesCancelled(&set, event);
+            director.lock()->getTouchDispatcher()->touchesCancelled(&set, event);
         };
         shouldDisableOnTouchEnd = false;
     }
@@ -136,7 +136,13 @@ class $modify(CCDirector) {
 
         if (!touchLayer) {
             touchLayer = TouchLayer::create(winSize, this);
-            getTouchDispatcher()->addTargetedDelegate(touchLayer, INT_MIN, false);
+            getTouchDispatcher()->addTargetedDelegate(touchLayer, -(1 << 15), false);
+        }
+
+        auto scene = getRunningScene();
+
+        if (touchLayer->getParent() != scene) {
+            touchLayer->setParent(scene);
         }
 
         if (pauseAntigravity && !resetQueued) {
@@ -144,14 +150,9 @@ class $modify(CCDirector) {
             return;
         }
 
-        auto scene = getRunningScene();
         if (isRelaxedAnyOf<CCTransitionScene*>(scene)) {
             CCDirector::drawScene();
             return;
-        }
-
-        if (touchLayer->getParent() != scene) {
-            touchLayer->setParent(scene);
         }
 
         auto mod = Mod::get();
@@ -176,7 +177,7 @@ class $modify(CCDirector) {
         if (mod->getSettingValue<bool>("enabled") && !resetQueued) {
             for (auto child : contextNodes) {
                 if (isAnyOf<PlayLayer*>(child)) continue;
-                if (!mod->getSettingValue<bool>("enable-in-editor") && isAnyOf<LevelEditorLayer*>(child)) continue;
+                if (!mod->getSettingValue<bool>("enable-in-editor") && isRelaxedAnyOf<LevelEditorLayer*>(child)) continue;
                 if (activeLayers.contains(child)) {
                     auto context = activeLayers[child];
                     context->setGravity(currentGravityX, currentGravityY);

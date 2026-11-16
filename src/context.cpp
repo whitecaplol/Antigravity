@@ -108,7 +108,7 @@ void collectDescendants(
             }
             return;
         }
-        if (!isAnyOf<PlayerObject*>(node) && isAnyOf<GameObject*>(node) && isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
+        if (!isAnyOf<PlayerObject*>(node) && isRelaxedAnyOf<GameObject*>(node) && isActuallyVisible(node) && nodeIntersectsViewport(node, winSize)) {
             visited->push_back(node);
             return;
         }
@@ -321,6 +321,10 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
     bodyDef.rotation = b2MakeRot(mathematicalAngle);
     bodyDef.userData = node;
 
+    if (isAnyOf<ScrollableContentLayer*>(node)) {
+        bodyDef.motionLocks.angularZ = true;
+    }
+
     auto bodyId = b2CreateBody(worldId, &bodyDef);
 
     auto shapeDef = b2DefaultShapeDef();
@@ -440,34 +444,33 @@ bool handleCallback(b2ShapeId id, void* context) {
     auto bodyId = b2Shape_GetBody(id);
     auto ctx = (CallbackContext*) context;
     auto node = (CCNode*) b2Body_GetUserData(bodyId);
-    if (ctx->currentMaps->contains(node)) {
+    if (b2Body_GetType(bodyId) != b2_staticBody && ctx->currentMaps->contains(node)) {
         auto data = ctx->currentMaps->at(node);
         if (!ctx->result || data.size < ctx->currentMaps->at(ctx->result).size) {
-            if (isRelaxedAnyOf<CCTouchClipper*, Slider*>(node)) {
-                ctx->result = nullptr;
-                return false;
-            }
             ctx->result = node;
         }
     }
     return true;
 }
 
-void AntigravityContext::beginDrag(b2Vec2 position) {
-    if (!b2World_IsValid(worldId)) return;
+bool AntigravityContext::beginDrag(b2Vec2 position) {
+    if (!b2World_IsValid(worldId)) return false;
+    endDrag();
     if (isEditor) {
-        auto levelEditorLayer = typeinfo_cast<LevelEditorLayer*>(root);
-        if (!levelEditorLayer || !levelEditorLayer->m_editorUI || !levelEditorLayer->m_editorUI->m_freeMoveEnabled) return;
+        return false;
     }
 
-    auto proxy = b2MakeProxy(&position, 1, 0.125f);
+    auto proxy = b2MakeProxy(&position, 1, 0.25f);
     CallbackContext ctx{nullptr, &currentMaps};
     b2World_OverlapShape(worldId, b2Pos_zero, &proxy, b2DefaultQueryFilter(), handleCallback, &ctx);
 
     auto node = ctx.result;
-    currentlyDragging = node;
+    if (isRelaxedAnyOf<CCTouchClipper*, Slider*>(node)) {
+        return false;
+    }
 
-    if (!currentlyDragging.valid()) return;
+    currentlyDragging = node;
+    if (!currentlyDragging.valid()) return false;
 
     auto bodyId = maps.at(node);
     auto motorDef = b2DefaultMotorJointDef();
@@ -486,10 +489,14 @@ void AntigravityContext::beginDrag(b2Vec2 position) {
 
     b2Body_SetAwake(bodyId, true);
     moveDrag(position);
+    return true;
 }
 
 void AntigravityContext::moveDrag(b2Vec2 position) {
-    if (!b2World_IsValid(worldId) || !currentlyDragging.valid() || !b2Joint_IsValid(dragJointId)) return;
+    if (!b2World_IsValid(worldId) || !currentlyDragging.valid() || !b2Joint_IsValid(dragJointId)) {
+        beginDrag(position);
+        return;
+    }
     b2Joint_SetLocalFrameA(dragJointId, {position, b2Rot_identity});
 }
 
@@ -519,7 +526,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             if (ctx.ref.valid()) {
                 if (b2Body_IsValid(bodyId) && nodeIntersectsViewport(node, winSize) && isActuallyVisible(node) && isCurrentlyWithinSceneGraph(node)) {
                     PriorData expectedData = currentMaps[node];
-                    if ((expectedData.position - getAbsolutePosition(node)).getLength() <= 1e-4 && abs(expectedData.angle - getAbsoluteRotation(node)) <= 1e-4) return false;
+                    if (((expectedData.position - getAbsolutePosition(node)).getLength() <= 1e-2 && abs(expectedData.angle - getAbsoluteRotation(node)) <= 1e-2) || currentlyDragging.lock() == node) return false;
                     markForQuickReset = true;
                 }
 
@@ -533,7 +540,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             }
         }
         if (b2Body_IsValid(bodyId)) {
-            if (markForQuickReset) {
+            if (markForQuickReset && !isEditor) {
                 IntermediateState intermediateState{b2Body_GetLinearVelocity(bodyId), b2Body_GetAngularVelocity(bodyId)};
                 justNeedsAReset.insert_or_assign(node, intermediateState);
             }
