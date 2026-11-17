@@ -1,7 +1,7 @@
 #include "context.hpp"
 
 void collectRemainingDescendants(CCNode* root, std::vector<CCNode*>* visited) {
-    if (!root || isAnyOf<GJListLayer*, PlayLayer*, LevelCell*>(root)) return;
+    if (!root || isAnyOf<GJListLayer*, PlayLayer*, LevelCell*>(root) || isRelaxedAnyOf<EditorWindowPopup*>(root)) return;
 
     if (isAnyOf<CCLayer*>(root) && (!isRelaxedAnyOf<CCLayer*>(root->getParent()) || root->getParent()->getChildrenCount() == 1)) {
         visited->push_back(root);
@@ -14,20 +14,22 @@ void collectRemainingDescendants(CCNode* root, std::vector<CCNode*>* visited) {
 
 void collectChildrenForContexts(CCNode* root, std::vector<CCNode*>* visited) {
     if (!root || root->getChildByType<LoadingLayer*>()) return;
-    visited->append_range(root->getChildrenExt());
     for (auto child : root->getChildrenExt()) {
-        if (isAnyOf<LevelEditorLayer*>(child)) continue;
-        collectRemainingDescendants(child, visited);
+        if (isRelaxedAnyOf<EditorWindowPopup*>(child)) continue;
+        visited->push_back(child);
+        if (!isAnyOf<LevelEditorLayer*>(child)) {
+            collectRemainingDescendants(child, visited);
+        }
     }
 }
 
-// This + the modification of text nodes when parented to scenegraph could probably be its own mod but we ball
+// This is cursed (pt 1)
 #include <Geode/modify/CCTextInputNode.hpp>
 class $modify(CCTextInputNode) {
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) {
         auto size = getContentSize();
-        auto ourAnchorPoint = isIgnoreAnchorPointForPosition() ? CCPointZero : getAnchorPoint();
-        auto point = convertTouchToNodeSpace(touch) + ((m_textField->getAnchorPoint() - ourAnchorPoint) * size);
+        auto anchorPointOffset = isIgnoreAnchorPointForPosition() ? CCPointZero : m_textField->getAnchorPoint();
+        auto point = convertTouchToNodeSpace(touch) + ((m_textField->getAnchorPoint() - anchorPointOffset) * size);
         auto result = 0 <= point.x && point.x <= size.width && 0 <= point.y && point.y <= size.height;
         if (result) {
             onClickTrackNode(true);
@@ -40,7 +42,7 @@ class $modify(CCTextInputNode) {
     }
 };
 
-// This is cursed
+// This is cursed (pt 2)
 class TouchLayer : public CCNode, public CCTargetedTouchDelegate {
 private:
     b2Vec2 initialPosition = b2Vec2_zero;
@@ -136,7 +138,7 @@ class $modify(CCDirector) {
 
         if (!touchLayer) {
             touchLayer = TouchLayer::create(winSize, this);
-            getTouchDispatcher()->addTargetedDelegate(touchLayer, -(1 << 15), false);
+            getTouchDispatcher()->addTargetedDelegate(touchLayer, -(1 << 10), false);
         }
 
         auto scene = getRunningScene();

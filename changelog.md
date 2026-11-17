@@ -1,3 +1,7 @@
+# 0.6.1
+- Corrections
+- Thanks to @GDLiquidFire for finding this
+
 # 0.6.0
 - Dragging (preview)
 
@@ -21,6 +25,7 @@
 # 0.5.1
 - Quite a few bug fixes
 - Correcting sliders and fonts
+- Thanks to @usrx215 for finding some of the bugs
 
 # 0.5.0
 - More proper state resetting.

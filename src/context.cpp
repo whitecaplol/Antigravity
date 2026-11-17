@@ -180,6 +180,15 @@ void centralizeAnchorPoint(CCNode* node) {
     node->setAnchorPoint({0.5, 0.5});
 }
 
+void doIgnoreAnchorPoint(CCNode* node) {
+    if (!node) return;
+    if (node->isIgnoreAnchorPointForPosition()) return;
+    auto anchorPoint = node->getAnchorPoint();
+    node->setPositionX(node->getPositionX() + (-anchorPoint.x) * node->getScaledContentWidth());
+    node->setPositionY(node->getPositionY() + (-anchorPoint.y) * node->getScaledContentHeight());
+    node->ignoreAnchorPointForPosition(true);
+}
+
 float getAbsoluteRotation(CCNode* node) {
     auto rotation = 0.0f;
     while (node) {
@@ -259,13 +268,20 @@ void updateTextInputNode(CCTextInputNode* textInput, bool reverse = false) {
         initialPositions.insert_or_assign(child, getAbsolutePosition(child));
     }
 
-    centralizeAnchorPoint(textInput);
+    if (!reverse) {
+        centralizeAnchorPoint(textInput);
+    }
+
     int scale = reverse ? 1 : -1;
     textInput->setPositionX(textInput->getPositionX() + scale * size.width * textAlignment.x);
     textInput->setPositionY(textInput->getPositionY() + scale * size.height * textAlignment.y);
 
     for (auto [child, position] : initialPositions) {
         child->setPosition(child->getPosition() + (position - getAbsolutePosition(child)));
+    }
+
+    if (reverse) {
+        doIgnoreAnchorPoint(textInput);
     }
 }
 
