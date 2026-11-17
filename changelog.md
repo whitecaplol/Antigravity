@@ -1,6 +1,10 @@
+# 0.6.2
+- Touch layer refinements
+- `CCTextInputNode` refinements
+
 # 0.6.1
 - Corrections
-- Thanks to @GDLiquidFire for finding this
+- Thanks to @GDLiquidFire for finding popup issue
 
 # 0.6.0
 - Dragging (preview)

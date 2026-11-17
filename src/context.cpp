@@ -257,7 +257,8 @@ void updateSlider(Slider* slider) {
 }
 
 void updateTextInputNode(CCTextInputNode* textInput, bool reverse = false) {
-    CCNode* primary = textInput->getTextLabel();
+    CCNode* primary = textInput->m_textField;
+    if (!primary) primary = textInput->getTextLabel();
     if (!primary) primary = textInput->m_textArea;
     auto textAlignment = primary->getAnchorPoint();
     auto size = textInput->getScaledContentSize();
@@ -556,7 +557,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
             }
         }
         if (b2Body_IsValid(bodyId)) {
-            if (markForQuickReset && !isEditor) {
+            if (markForQuickReset) {
                 IntermediateState intermediateState{b2Body_GetLinearVelocity(bodyId), b2Body_GetAngularVelocity(bodyId)};
                 justNeedsAReset.insert_or_assign(node, intermediateState);
             }

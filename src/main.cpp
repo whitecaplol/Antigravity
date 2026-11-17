@@ -43,7 +43,7 @@ class $modify(CCTextInputNode) {
 };
 
 // This is cursed (pt 2)
-class TouchLayer : public CCNode, public CCTargetedTouchDelegate {
+class TouchLayer : public CCLayer {
 private:
     b2Vec2 initialPosition = b2Vec2_zero;
     b2Vec2 position = b2Vec2_zero;
@@ -53,10 +53,12 @@ private:
     bool shouldDisableOnTouchEnd = false;
 protected:
     bool init(const CCSize& winSize, CCDirector* director) {
-        if (!CCNode::init())
-            return false;
+        if (!CCLayer::init()) return false;
 
         this->director = director;
+        setTouchMode(kCCTouchesOneByOne);
+        setTouchPriority(-(1 << 10));
+        setTouchEnabled(true);
         setContentSize(winSize);
         setZOrder(1 << 15);
         return true;
@@ -71,6 +73,11 @@ public:
 
         delete ret;
         return nullptr;
+    }
+
+    void registerWithTouchDispatcher() override {
+        if (!director.valid()) return;
+        director.lock()->sharedDirector()->getTouchDispatcher()->addTargetedDelegate(this, getTouchPriority(), false);
     }
 
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
@@ -138,13 +145,15 @@ class $modify(CCDirector) {
 
         if (!touchLayer) {
             touchLayer = TouchLayer::create(winSize, this);
-            getTouchDispatcher()->addTargetedDelegate(touchLayer, -(1 << 10), false);
+            touchLayer->retain();
         }
 
         auto scene = getRunningScene();
 
         if (touchLayer->getParent() != scene) {
+            touchLayer->onExit();
             touchLayer->setParent(scene);
+            touchLayer->onEnter();
         }
 
         if (pauseAntigravity && !resetQueued) {
@@ -175,10 +184,15 @@ class $modify(CCDirector) {
         auto currentGravityY = mod->getSettingValue<float>("gravity-y");
         auto glueFonts = mod->getSettingValue<bool>("glue-fonts");
         auto dt = fmin(getDeltaTime(), 1.0f / 30);
+        auto retoggleDragging = true;
 
         if (mod->getSettingValue<bool>("enabled") && !resetQueued) {
             for (auto child : contextNodes) {
-                if (isAnyOf<PlayLayer*>(child)) continue;
+                if (auto playLayer = typeinfo_cast<PlayLayer*>(child)) {
+                    retoggleDragging = false;
+                    touchLayer->setTouchEnabled(!(playLayer->isGameplayActive() && !playLayer->m_isPaused));
+                    continue;
+                }
                 if (!mod->getSettingValue<bool>("enable-in-editor") && isRelaxedAnyOf<LevelEditorLayer*>(child)) continue;
                 if (activeLayers.contains(child)) {
                     auto context = activeLayers[child];
@@ -212,6 +226,10 @@ class $modify(CCDirector) {
             for (const auto& [node, context] : activeLayers) {
                 context->reset();
             }
+        }
+
+        if (retoggleDragging) {
+            touchLayer->setTouchEnabled(true);
         }
 
         pokeQueued = false;
