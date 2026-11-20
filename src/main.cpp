@@ -142,13 +142,21 @@ bool pauseAntigravity = false;
 class $modify(CCDirector) {
     void drawScene() {
         auto winSize = getWinSize();
+        auto mod = Mod::get();
 
-        if (!touchLayer) {
+        if (!touchLayer && mod->getSettingValue<bool>("enabled")) {
             touchLayer = TouchLayer::create(winSize, this);
             touchLayer->retain();
         }
 
         auto scene = getRunningScene();
+
+        if (isRelaxedAnyOf<CCTransitionScene*>(scene)) {
+            CCDirector::drawScene();
+            touchLayer->setTouchEnabled(false);
+            touchLayer->setParent(nullptr);
+            return;
+        }
 
         if (touchLayer->getParent() != scene) {
             touchLayer->onExit();
@@ -160,13 +168,6 @@ class $modify(CCDirector) {
             CCDirector::drawScene();
             return;
         }
-
-        if (isRelaxedAnyOf<CCTransitionScene*>(scene)) {
-            CCDirector::drawScene();
-            return;
-        }
-
-        auto mod = Mod::get();
 
         std::vector<CCNode*> contextNodes;
         collectChildrenForContexts(scene, &contextNodes);
@@ -228,7 +229,7 @@ class $modify(CCDirector) {
             }
         }
 
-        if (retoggleDragging) {
+        if (retoggleDragging && touchLayer) {
             touchLayer->setTouchEnabled(true);
         }
 
