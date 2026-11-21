@@ -262,9 +262,7 @@ $on_game(Loaded) {
         }
     });
 
-    for (auto mod : Loader::get()->getAllMods()) {
-        if (mod->getID() == "colon.bumpscosity") {
-            doILoveGDCologne = true;
-        }
+    if (Loader::get()->getLoadedMod("colon.bumpscosity")) {
+        doILoveGDCologne = true;
     }
 }
