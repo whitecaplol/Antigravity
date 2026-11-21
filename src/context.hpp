@@ -89,6 +89,7 @@ public:
     bool beginDrag(b2Vec2 click);
     void moveDrag(b2Vec2 click);
     void endDrag();
+    void updateBumpscosity(float bumpscosity);
     void setGravity(float gravityX, float gravityY);
     void setGlueFonts(bool set);
     void reset();

@@ -338,7 +338,7 @@ void AntigravityContext::setUpPhysics(CCNode* node, b2Vec2 velocity, float angul
     bodyDef.rotation = b2MakeRot(mathematicalAngle);
     bodyDef.userData = node;
 
-    if (isAnyOf<ScrollableContentLayer*>(node)) {
+    if (isAnyOf<ScrollableContentLayer*>(node) || node->getChildByType<CustomListView*>()) {
         bodyDef.motionLocks.angularZ = true;
     }
 
@@ -395,8 +395,8 @@ void AntigravityContext::updateShapes(CCNode* node, float halfThickness) {
     if (!b2Body_IsValid(bodyId)) return;
 
     auto estNumShapes = b2Body_GetShapeCount(bodyId);
-    b2ShapeId shapeArray[8];
-    auto actualNumShapes = b2Body_GetShapes(bodyId, shapeArray, estNumShapes);
+    b2ShapeId shapeArray[estNumShapes];
+    b2Body_GetShapes(bodyId, shapeArray, estNumShapes);
 
     auto halfSize = (isAnyOf<CCFontSprite*>(node) ? getCCFontSpriteTrueSize(exact_cast<CCFontSprite*>(node)) : getTruerSize(node)) * 0.5f;
     halfSize.setSize(fmax(halfSize.width, halfThickness), fmax(halfSize.height, halfThickness));
@@ -482,7 +482,7 @@ bool AntigravityContext::beginDrag(b2Vec2 position) {
     b2World_OverlapShape(worldId, b2Pos_zero, &proxy, b2DefaultQueryFilter(), handleCallback, &ctx);
 
     auto node = ctx.result;
-    if (isRelaxedAnyOf<CCTouchClipper*, Slider*>(node)) {
+    if (isRelaxedAnyOf<CCTouchClipper*, Slider*, ScrollableContentLayer*, ScrollLayer*>(node)) {
         return false;
     }
 
@@ -523,6 +523,22 @@ void AntigravityContext::endDrag() {
     }
     dragJointId = b2_nullJointId;
     currentlyDragging = nullptr;
+}
+
+void AntigravityContext::updateBumpscosity(float bumpscosity) {
+    if (material.restitution == bumpscosity) return;
+    material.restitution = bumpscosity;
+    for (auto [_, bodyId] : maps) {
+        if (!b2Body_IsValid(bodyId)) continue;
+        auto estNumShapes = b2Body_GetShapeCount(bodyId);
+        b2ShapeId shapeArray[estNumShapes];
+        b2Body_GetShapes(bodyId, shapeArray, estNumShapes);
+
+        for (auto shapeId : shapeArray) {
+            if (!b2Shape_IsValid(shapeId)) continue;
+            b2Shape_SetRestitution(shapeId, bumpscosity);
+        }
+    }
 }
 
 bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNodes, bool poke) {
@@ -620,7 +636,7 @@ bool AntigravityContext::step(float dt, std::unordered_set<CCNode*>* contextNode
     }
 
     if (isEditor) {
-        auto zoom = typeinfo_cast<LevelEditorLayer*>(root)->m_drawGridLayer->getParent()->getScale(); // This is probably not ideal (will be reevaluated in beta 1. I suspect zoom is not being properly hooked?)
+        auto zoom = typeinfo_cast<LevelEditorLayer*>(root)->m_drawGridLayer->getParent()->getScale(); // This is probably not ideal (will be reevaluated when v6 Stable. I suspect zoom is not being properly hooked?)
         b2World_SetGravity(worldId, b2MulSV(zoom, gravity));
     }
 

@@ -18,3 +18,8 @@ Adds physics (why not?)
 
 ## Roadmap
 Refinements
+
+## Potential Quirks
+- If you've also installed Menu Physics by rcg21/rhcng, a black hole will be summoned. Sorry!
+    - Obviously joking. Antigravity should have no problem handling this, although there may be funny issues
+- I love GD Cologne

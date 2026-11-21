@@ -1,3 +1,9 @@
+# 0.6.3
+- Scrollable refinements
+- Dragging refinements
+- I love GD Cologne
+- (First update after being on the index! Thank you all so much for downloading!)
+
 # 0.6.2
 - Touch layer refinements
 - `CCTextInputNode` refinements

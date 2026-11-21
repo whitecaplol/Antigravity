@@ -137,6 +137,7 @@ TouchLayer* touchLayer = nullptr;
 bool resetQueued = false;
 bool pokeQueued = false;
 bool pauseAntigravity = false;
+bool doILoveGDCologne = false;
 
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
@@ -212,6 +213,10 @@ class $modify(CCDirector) {
                     } else {
                         context->endDrag();
                     }
+                    if (doILoveGDCologne) {
+                        auto bumpscosity = Loader::get()->getLoadedMod("colon.bumpscosity")->getSavedValue<float>("bumpscosity", 0); // i.e. Restitution, but that's boring
+                        context->updateBumpscosity(bumpscosity);
+                    }
                     auto success = context->step(dt, &current, pokeQueued);
                     if (!success) {
                         delete activeLayers.at(child);
@@ -256,4 +261,10 @@ $on_game(Loaded) {
             pokeQueued = true;
         }
     });
+
+    for (auto mod : Loader::get()->getAllMods()) {
+        if (mod->getID() == "colon.bumpscosity") {
+            doILoveGDCologne = true;
+        }
+    }
 }
