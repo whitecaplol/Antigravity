@@ -1,3 +1,7 @@
+# 0.6.4
+- `if (touchlayer`
+    - (Thanks to @poskekgd on Discord for finding this issue)
+
 # 0.6.3
 - Scrollable refinements
 - Dragging refinements
