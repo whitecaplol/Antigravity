@@ -134,10 +134,10 @@ public:
 // Because CCDirectors do not support fields
 std::unordered_map<CCNode*, AntigravityContext*> activeLayers;
 TouchLayer* touchLayer = nullptr;
+Mod* iLoveGDCologne = nullptr;
 bool resetQueued = false;
 bool pokeQueued = false;
 bool pauseAntigravity = false;
-bool doILoveGDCologne = false;
 
 #include <Geode/modify/CCDirector.hpp>
 class $modify(CCDirector) {
@@ -213,8 +213,8 @@ class $modify(CCDirector) {
                     } else {
                         context->endDrag();
                     }
-                    if (doILoveGDCologne) {
-                        auto bumpscosity = Loader::get()->getLoadedMod("colon.bumpscosity")->getSavedValue<float>("bumpscosity", 0); // i.e. Restitution, but that's boring
+                    if (iLoveGDCologne) {
+                        auto bumpscosity = iLoveGDCologne->getSavedValue<float>("bumpscosity", 0); // i.e. Restitution, but that's boring
                         context->updateBumpscosity(bumpscosity);
                     }
                     auto success = context->step(dt, &current, pokeQueued);
@@ -262,7 +262,5 @@ $on_game(Loaded) {
         }
     });
 
-    if (Loader::get()->getLoadedMod("colon.bumpscosity")) {
-        doILoveGDCologne = true;
-    }
+    iLoveGDCologne = Loader::get()->getLoadedMod("colon.bumpscosity");
 }
