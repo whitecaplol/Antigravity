@@ -154,12 +154,14 @@ class $modify(CCDirector) {
 
         if (isRelaxedAnyOf<CCTransitionScene*>(scene)) {
             CCDirector::drawScene();
-            touchLayer->setTouchEnabled(false);
-            touchLayer->setParent(nullptr);
+            if (touchLayer) {
+                touchLayer->setTouchEnabled(false);
+                touchLayer->setParent(nullptr);
+            }
             return;
         }
 
-        if (touchLayer->getParent() != scene) {
+        if (touchLayer && touchLayer->getParent() != scene) {
             touchLayer->onExit();
             touchLayer->setParent(scene);
             touchLayer->onEnter();
