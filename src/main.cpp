@@ -145,7 +145,9 @@ class $modify(CCDirector) {
         auto winSize = getWinSize();
         auto mod = Mod::get();
 
-        if (!touchLayer && mod->getSettingValue<bool>("enabled")) {
+        auto canDrag = mod->getSettingValue<bool>("enable-drag");
+
+        if (!touchLayer && mod->getSettingValue<bool>("enabled") && canDrag) {
             touchLayer = TouchLayer::create(winSize, this);
             touchLayer->retain();
         }
@@ -162,7 +164,6 @@ class $modify(CCDirector) {
         }
 
         if (touchLayer && touchLayer->getParent() != scene) {
-            touchLayer->onExit();
             touchLayer->setParent(scene);
             touchLayer->onEnter();
         }
@@ -183,7 +184,6 @@ class $modify(CCDirector) {
             return true;
         });
 
-        auto canDrag = mod->getSettingValue<bool>("enable-drag");
         auto currentGravityX = mod->getSettingValue<float>("gravity-x");
         auto currentGravityY = mod->getSettingValue<float>("gravity-y");
         auto glueFonts = mod->getSettingValue<bool>("glue-fonts");
@@ -194,7 +194,9 @@ class $modify(CCDirector) {
             for (auto child : contextNodes) {
                 if (auto playLayer = typeinfo_cast<PlayLayer*>(child)) {
                     retoggleDragging = false;
-                    touchLayer->setTouchEnabled(!(playLayer->isGameplayActive() && !playLayer->m_isPaused));
+                    if (touchLayer) {
+                        touchLayer->setTouchEnabled(!(playLayer->isGameplayActive() && !playLayer->m_isPaused));
+                    }
                     continue;
                 }
                 if (!mod->getSettingValue<bool>("enable-in-editor") && isRelaxedAnyOf<LevelEditorLayer*>(child)) continue;
@@ -202,7 +204,7 @@ class $modify(CCDirector) {
                     auto context = activeLayers[child];
                     context->setGravity(currentGravityX, currentGravityY);
                     context->setGlueFonts(glueFonts);
-                    if (canDrag && child == contextNodes.back()) {
+                    if (touchLayer && canDrag && child == contextNodes.back()) {
                         if (touchLayer->isTouchActive()) {
                             if (touchLayer->isFirstQuerySinceNewActive()) {
                                 context->beginDrag(touchLayer->getTouch());

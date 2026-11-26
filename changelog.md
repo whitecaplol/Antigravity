@@ -1,3 +1,8 @@
+# 0.6.5
+- More robust TouchLayer
+    - Particularly to stop the mod from crashing when QOLMod is installed
+    - Thanks to @usrx215 for finding this issue
+
 # 0.6.4
 - `if (touchlayer`
     - (Thanks to @poskekgd on Discord for finding this issue)
